@@ -1,7 +1,6 @@
-# Crosscut J — Superhuman (=Superpower), Arena, Lovable 2.0, LaunchAnything, Island x AI
+# Crosscut J — Superpower, Arena, Lovable 2.0, LaunchAnything, Island x AI
 
 Films: Superpower health launch (85 s), Arena/LMArena identity (75 s), Lovable 2.0 platform launch (80 s), LaunchAnything studio reel (27 s), Island AI Protect teaser (30 s).
-Heads-up: the folder "Superhuman" is **Superpower** (superpower.com, blood tests), not the Superhuman email client.
 
 ## 1. Patterns that recur across these films
 

@@ -41,7 +41,7 @@ Frame-grid sections, where each frame is a 480×270 thumbnail:
 - **Rate limits:** Starter plans allow 20 MCP calls per month, Pro allows 200 per day at 10/min, and Enterprise Full seats allow 600 per day at 20/min. The file must be in a team where the connected account has **edit** access.
 - If one Figma MCP connection returns "you don't have edit access" even though the file is shared, try any other configured Figma connection before asking the user to change sharing. One can fail while another succeeds. Run `whoami` to see which account and seats a connection uses.
 - A section whose width is greater than its height gets clamped if you set `maxDimension` to its height. Pass `max(width, height)`.
-- Farm the per-film analysis out to parallel agents with a shared brief (see the `_brief.md` pattern: shot list, transition inventory, easy-to-miss details, pacing, reusable techniques, cross-film patterns).
+- Farm the per-film analysis out to parallel agents with a shared brief. `references/analysis-brief.md` is the one used to build this skill: shot list, transition inventory, easy-to-miss details, pacing, reusable techniques, cross-film patterns.
 
 ## Common bugs
 - **Scenes bleeding into each other:** you toggled `visibility` instead of `display`.

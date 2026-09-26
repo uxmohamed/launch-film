@@ -1,8 +1,8 @@
 # Case index — 59 films by mode
 
-Each file: shot list, transition inventory, easy-to-miss details, pacing, reusable techniques. `crosscut_*.md` = cross-film patterns; E–N end with a "vs. the manual" section.
+Each file: shot list, transition inventory, easy-to-miss details, pacing, reusable techniques. `crosscut_*.md` = cross-film patterns. Crosscuts A–D built the first draft of this skill from 14 films. Crosscuts E–N end with a "vs. the manual" section written against that draft, and their findings are folded into `../modes.md`.
 
-Caveats: "Superpower" was filed in Figma as "Superhuman" (it is superpower.com). Sphinx frames stop at #400 (ending may be missing). Shopify looks like a design-site reel (no logo in sampled frames). Frame spacing ≈0.5 s ±15%.
+Caveats: Sphinx frames stop at #400 (ending may be missing). Shopify looks like a design-site reel (no logo in sampled frames). Frame spacing ≈0.5 s ±15%.
 
 ## M1 product/SaaS
 - **Adaline** — Adaline is an observability/evals platform for AI agents; the spine is a spoken-word manifesto ("observability is dead" → "the bottleneck is no longer the agent, it's you" → "Adaline runs the loop" → "ship agents that se…

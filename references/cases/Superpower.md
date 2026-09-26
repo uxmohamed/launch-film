@@ -1,6 +1,5 @@
-# Superhuman (folder name) — actually **Superpower** (superpower.com), consumer health / blood-test platform launch (169 frames ≈ 85 s)
+# Superpower (superpower.com): consumer health / blood-test platform launch (169 frames ≈ 85 s)
 
-Note: the folder is named "Superhuman" but every wordmark and URL on screen reads "superpower" (#62–63, #163–169). Not the Superhuman email client.
 
 ## 1. One-line concept
 Superpower sells a 100+ marker blood test that feeds a "Digital Twin" of your body plus an AI you can ask. Spine: **two-world film** — a hot, analog, orange editorial-collage "body" world (mystery, anxiety: "Is this normal? / Why am I so tired? / Should I be worried about this?") that is *resolved* into a cool, white, clinical-clean product world ("Your body is a miracle … understandable … yours. … Control your health is finally yours … Know how you really stand … The story of your health. Alive. Changing. Uniquely yours."). The film is literally a before/after of the viewer's *state of mind*, with the wordmark as the hinge between the two worlds (#59–63).

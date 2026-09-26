@@ -22,7 +22,7 @@ Two of them are from the same brand (Claude), which lets us see how one company 
 6. **Hard cuts carried by the world, not by lineage.** Keep thinking (~100 cuts) and Blueprint (~40 cuts) almost never morph. Continuity is the grade and grain, a recurring word (PROBLEMS), a fixed anchor cluster (the Blueprint grid), or a consistent overlay language.
 7. **Verb-literal geometry.** Index: "closing up" → the ground irises shut; "weren't built for this" → a gravity collapse; "millions of agents" → a density ramp. Cowork: "keeps working even when you're not" → the laptop lid closes and the work continues in a cloud.
 
-## 2. Contradictions between my films (and why)
+## 2. Contradictions between these films (and why)
 - **Morph vs. cut.** Index morphs the atom constantly (it's abstract, so anything can become anything). Keep thinking and Blueprint cut constantly, because live action and archival scans can't morph, so they unify through grade and grain. Rule: *lineage for drawn worlds, grade/anchor for found or shot worlds.*
 - **End on an emptied ground vs. a living frame.** Index and Cowork end on an empty ground (paper, off-white) with the logo held 3.5 s. Keep thinking puts the lockup **over live footage** with the subject still moving (#172–178). Blueprint ends on a busy drawing with the title and dates and only ~1.5 s of hold. Brand films of the photographic kind keep the world, and teasers cut short.
 - **Where the brand appears.** Index shows the logomark at ~70% of runtime, then again as the end lockup. Keep thinking names Claude only in the last ~4%. Cowork shows the product UI at 3 s and the logo only at the end. Blueprint shows the presenter's logo first (#1) and the event's name last. That's two brands with two slots.
@@ -77,7 +77,7 @@ Two of them are from the same brand (Claude), which lets us see how one company 
 24. **Monochrome world pass with re-rolled grain** (Blueprint). All archival sources are mapped to two tones (ground + line) with per-frame grain at ~10% luminance. The world is made by treatment, not by a ground plate.
 25. **Macro title sweep** (Blueprint #50–55). Truck across the wordmark at ~6× scale with ~10° tilt for ~2 s, then settle to the readable title at ~12% of frame height, with the rotation settling as the camera does.
 
-### (b) Where my films CONTRADICT the manual
+### (b) Where these films contradict the manual
 - **"End by subtraction on an emptied ground."** Keep thinking puts the lockup over live, moving footage (#172–178), and it also *adds* an 8.5 s epilogue after the tagline card (#155–171), so the tagline is not the end. Blueprint ends on a busy drawing with ~1.5 s of hold, below the manual's 2–5 s.
 - **"Things become, they don't cut" / "follow one object."** Keep thinking (~100 hard cuts, no single object, a cast of ~40 people) and Blueprint (~40 cuts across 15 unrelated inventions) are premium with no lineage at all. Their carriers are a recurring word, the grade/grain, and an anchor cluster. The manual should allow a **"motif-anchored montage"** mode for brand and archival films.
 - **"Show a full window 1–3 times; never device mockups by default"** and "device = someone else's world." Cowork spends ~45% of its runtime inside flat illustrated devices (laptop #54–57, #132–135; phone #73–118) of *its own* product. The device is there because *time and place* are the story (overnight at the desk, morning on the phone). The rule should be: a device is allowed when the device's state (lid, clock, notification) carries narrative.
@@ -86,7 +86,7 @@ Two of them are from the same brand (Claude), which lets us see how one company 
 - **"The camera is a reader; hold drift everywhere."** Index is locked-off for ~90% of its runtime with no hold drift on the text beats. Life comes from typing, backspacing, the dot growing and particle motion, not the camera. Stillness reads as essay, as the manual allows for Raindrop/Veryfront, but here it's in a 96 s film.
 - **"Front-load proof in long films (logo by 20–35%)."** Index (logomark at ~70%) and Keep thinking (brand at ~96%) are long films that save the brand for the end. The manual's front-loading applies to product launches, not manifestos.
 
-### (c) Manual claims my films strongly confirm
+### (c) Manual claims these films strongly confirm
 - **Arrival state: ghost at 30–40% then settle** (Cowork #1–5, and again in the wordmark "Claud[e]" #157), with one arrival state used at both ends.
 - **Caret-follow macro** with the caret at ~60–65% of frame width and text running off the left edge (Cowork #11–20); **typing at 6–8 chars per 0.5 s** for readable text (Cowork, Index).
 - **Micro-states demos skip:** the empty card frame before chrome fills (Cowork #7), hover → hand cursor one frame before the click (#24–26), spinner ring → check (#38–42), "Result" tags and shimmer on the in-progress row (#34).
