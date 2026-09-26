@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cadie Launch Film</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..600&family=Archivo:wdth,wght@62..125,400..700&display=block" rel="stylesheet">
+<style>
+:root{
+  /* film tokens — Cadie blue system on the original paper background */
+  --paper:#F4F2F0;
+  --ink:#0B1F4B;          /* primary text (was black) */
+  --blue:#2457F5;         /* brand blue: pills, logo */
+  --blue-soft:#DCE5FB;
+  --pill:#FFFFFF;
+  --pill-line:rgba(36,87,245,.16);
+  --ui:#06112B;           /* phone UI (was black) */
+  --ui-2:#12224A;
+  --ui-3:#1B2D5E;
+  --ui-mute:#8395C2;
+  /* page chrome */
+  --page:#E7E5E2; --chrome-ink:#0B1F4B; --chrome-mute:#5A6680; --chrome-line:rgba(11,31,75,.14);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --page:#0B0F1A; --chrome-ink:#E6ECFA; --chrome-mute:#8C98B5; --chrome-line:rgba(230,236,250,.14); }
+}
+:root[data-theme="dark"]{ --page:#0B0F1A; --chrome-ink:#E6ECFA; --chrome-mute:#8C98B5; --chrome-line:rgba(230,236,250,.14); }
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--page);color:var(--chrome-ink);font-family:Inter,system-ui,sans-serif;overflow:hidden;display:flex;flex-direction:column}
+#viewport{flex:1;position:relative;overflow:hidden;min-height:0}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;background:var(--paper);overflow:hidden;transform-origin:0 0;
+  font-family:Inter,sans-serif;color:var(--ink);font-feature-settings:"ss01" 0,"cv11" 1;-webkit-font-smoothing:antialiased}
+.scene{position:absolute;inset:0;visibility:hidden}
+.abs{position:absolute;left:0;top:0;will-change:transform,opacity}
+.word{white-space:nowrap;font-weight:450;letter-spacing:-.012em;line-height:1}
+.pill{background:var(--pill);border:1px solid var(--pill-line);box-shadow:0 1px 2px rgba(11,31,75,.05),0 6px 18px -10px rgba(11,31,75,.18);white-space:nowrap;color:var(--blue);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.pill>span{display:block;font-weight:470;letter-spacing:-.01em;line-height:1;will-change:transform,filter,opacity}
+.img{background-repeat:no-repeat;background-color:#C9D3EA;overflow:hidden}
+.cbtn{border-radius:999px;display:flex;align-items:center;justify-content:center}
+/* phone */
+#phone{width:440px;height:950px;border-radius:62px;background:var(--ui);overflow:hidden;color:#fff;box-shadow:0 30px 80px -30px rgba(6,17,43,.45)}
+#phone .layer{position:absolute;inset:0}
+.ph-status{position:absolute;left:0;right:0;top:0;height:60px;display:flex;align-items:center;justify-content:space-between;padding:14px 38px 0 52px;font-weight:600;font-size:17px;letter-spacing:-.01em}
+.ph-status .ic{display:flex;gap:6px;align-items:center}
+.bat{background:#fff;color:var(--ui);font-size:12px;font-weight:700;border-radius:5px;padding:1px 5px;line-height:15px}
+.ph-cap{position:absolute;left:0;right:0;text-align:center;font-size:14.5px;color:#C9D3EE;white-space:nowrap}
+.ph-cap b{font-weight:500;color:#fff;background:var(--ui-3);border-radius:5px;padding:2px 5px}
+.tab{position:absolute;top:176px;font-size:17px;color:var(--ui-mute);font-weight:470}
+#controls{flex:none;display:flex;align-items:center;gap:14px;padding:12px 16px;border-top:1px solid var(--chrome-line);font-size:13px;color:var(--chrome-mute)}
+#controls button{font:inherit;font-weight:600;color:var(--chrome-ink);background:transparent;border:1px solid var(--chrome-line);border-radius:999px;padding:7px 16px;cursor:pointer;min-width:84px}
+#controls button:hover{border-color:var(--chrome-ink)}
+#scrub{flex:1;accent-color:#2457F5;min-width:60px}
+#time{font-variant-numeric:tabular-nums;min-width:86px;text-align:right}
+#bigplay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;cursor:pointer;background:transparent;border:0}
+#bigplay span{background:#2457F5;color:#fff;font:600 15px Inter,sans-serif;padding:14px 26px;border-radius:999px;box-shadow:0 10px 30px -10px rgba(36,87,245,.6)}
+body.capture #controls,body.capture #bigplay{display:none}
+@media (prefers-reduced-motion: reduce){ #bigplay span{box-shadow:none} }
+</style>
+</head>
+<body>
+<div id="viewport"><div id="stage"></div><button id="bigplay" aria-label="Play film"><span>▶ Play film (sound on)</span></button></div>
+<div id="controls">
+  <button id="play">Play</button>
+  <input id="scrub" type="range" min="0" max="20" step="0.01" value="0" aria-label="Scrub timeline">
+  <span id="time">0.00 / 20.00</span>
+</div>
+<audio id="au" src="cadie-audio.wav" preload="auto"></audio>
+<script>
+(() => {
+'use strict';
+const W = 1920, H = 1080, DUR = 20;
+const stage = document.getElementById('stage');
+const CAPTURE = new URLSearchParams(location.search).has('capture');
+if (CAPTURE) document.body.classList.add('capture');
+
+/* ---------------- easing ---------------- */
+function bezier(x1, y1, x2, y2) {
+  const cx = 3*x1, bx = 3*(x2-x1)-cx, ax = 1-cx-bx, cy = 3*y1, by = 3*(y2-y1)-cy, ay = 1-cy-by;
+  const sx = t => ((ax*t+bx)*t+cx)*t, sy = t => ((ay*t+by)*t+cy)*t, dx = t => (3*ax*t+2*bx)*t+cx;
+  return x => {
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    let t = x;
+    for (let i = 0; i < 8; i++) { const e = sx(t)-x; if (Math.abs(e) < 1e-5) break; const d = dx(t); if (Math.abs(d) < 1e-6) break; t -= e/d; }
+    return sy(Math.min(1, Math.max(0, t)));
+  };
+}
+const EO   = bezier(.16, 1, .3, 1);     // expo-out: every entrance in the reference
+const EIO  = bezier(.65, 0, .35, 1);    // re-centering / camera moves
+const EI   = bezier(.55, 0, .9, .4);    // exits, scroll acceleration
+const BACK = bezier(.34, 1.56, .64, 1); // button pops (overshoot)
+const LIN  = x => Math.min(1, Math.max(0, x));
+const clamp = (v, a=0, b=1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, p) => a + (b-a)*p;
+const P = (t, t0, d, e=EO) => e(clamp((t-t0)/d));
+
+/* ---------------- dom helpers ---------------- */
+function el(tag, cls, parent, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; (parent||stage).appendChild(e); return e; }
+function tf(e, x, y, s=1, o=1, extra='') { e.style.transform = `translate3d(${x}px,${y}px,0) scale(${s})${extra}`; e.style.opacity = o; }
+function show(e, v) { e.style.visibility = v ? 'visible' : 'hidden'; }
+function disp(e, v) { e.style.display = v ? '' : 'none'; e.style.visibility = 'visible'; }
+
+/* ---------------- procedural imagery (blue editorial monochrome) ---------------- */
+function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
+const gv = (v, a=1) => { v = Math.round(clamp(v)*255); return `rgba(${v},${v},${v},${a})`; };
+function rnd(seed) { let s = seed % 2147483647; if (s <= 0) s += 2147483646; return () => (s = s*16807 % 2147483647, (s-1)/2147483646); }
+function lin(x, x0, y0, x1, y1, stops) { const g = x.createLinearGradient(x0, y0, x1, y1); stops.forEach(([o, v, a]) => g.addColorStop(o, gv(v, a ?? 1))); return g; }
+function rad(x, cx, cy, r0, r1, stops, ox=0, oy=0) { const g = x.createRadialGradient(cx+ox, cy+oy, r0, cx, cy, r1); stops.forEach(([o, v, a]) => g.addColorStop(o, gv(v, a ?? 1))); return g; }
+function blurDraw(x, px, fn) { x.save(); x.filter = `blur(${px}px)`; fn(); x.restore(); }
+function lowNoise(x, w, h, cells, alpha, blur, seed) {
+  const r = rnd(seed), cw = cells, ch = Math.max(2, Math.round(cells*h/w));
+  const [n, nx] = mk(cw, ch); const id = nx.createImageData(cw, ch);
+  for (let i = 0; i < cw*ch; i++) { const v = r()*255; id.data[i*4] = id.data[i*4+1] = id.data[i*4+2] = v; id.data[i*4+3] = 255; }
+  nx.putImageData(id, 0, 0);
+  x.save(); x.globalAlpha = alpha; x.imageSmoothingQuality = 'high'; x.filter = `blur(${blur}px)`; x.globalCompositeOperation = 'overlay'; x.drawImage(n, -blur*2, -blur*2, w+blur*4, h+blur*4); x.restore();
+}
+function rr(x, X, Y, w, h, r) { x.beginPath(); x.roundRect(X, Y, w, h, r); }
+
+// luminance -> blue duotone ramp + grain + vignette
+const RAMP = [[0,[4,12,34]],[.28,[18,40,98]],[.55,[78,110,182]],[.8,[176,195,232]],[1,[243,246,253]]];
+const LUT = (() => { const L = new Uint8ClampedArray(256*3);
+  for (let i = 0; i < 256; i++) { const v = i/255; let k = 0; while (k < RAMP.length-2 && v > RAMP[k+1][0]) k++;
+    const [a, ca] = RAMP[k], [b, cb] = RAMP[k+1], p = (v-a)/(b-a);
+    for (let j = 0; j < 3; j++) { const blue = ca[j] + (cb[j]-ca[j])*p; L[i*3+j] = blue*.86 + i*.14; } }
+  return L; })();
+function finish(c, seed, vig=.18, grain=9) {
+  const x = c.getContext('2d'), w = c.width, h = c.height, id = x.getImageData(0, 0, w, h), d = id.data, r = rnd(seed);
+  for (let y = 0; y < h; y++) for (let X = 0; X < w; X++) {
+    const i = (y*w+X)*4, dx = X/w-.5, dy = y/h-.5;
+    let l = d[i]*(1 - vig*(dx*dx+dy*dy)*2.2) + (r()-.5)*grain;
+    l = l < 0 ? 0 : l > 255 ? 255 : l|0;
+    d[i] = LUT[l*3]; d[i+1] = LUT[l*3+1]; d[i+2] = LUT[l*3+2];
+  }
+  x.putImageData(id, 0, 0); return c;
+}
+
+function paintChair() {
+  const [c, x] = mk(1000, 1300);
+  x.fillStyle = lin(x, 0, 0, 0, 1300, [[0,.83],[.6,.9],[1,.95]]); x.fillRect(0, 0, 1000, 1300);
+  blurDraw(x, 45, () => { x.fillStyle = gv(.6, .55); x.beginPath(); x.ellipse(560, 1150, 400, 70, 0, 0, 7); x.fill(); });
+  const acrylic = (X, Y, w, h, a) => {
+    x.lineJoin = 'round';
+    rr(x, X, Y, w, h, 16); x.lineWidth = 26; x.strokeStyle = gv(.96, .5*a); x.stroke();
+    rr(x, X-12, Y-12, w+24, h+24, 26); x.lineWidth = 3; x.strokeStyle = gv(.32, .85*a); x.stroke();
+    rr(x, X+12, Y+12, w-24, h-24, 8); x.lineWidth = 2.5; x.strokeStyle = gv(.4, .8*a); x.stroke();
+    rr(x, X-4, Y-4, w+8, h+8, 20); x.lineWidth = 2; x.strokeStyle = gv(1, .95*a); x.stroke();
+    blurDraw(x, 8, () => { x.fillStyle = gv(.55, .35*a); x.fillRect(X-20, Y+h+6, w+40, 14); });
+  };
+  acrylic(452, 690, 96, 330, .55); acrylic(706, 680, 86, 310, .55);
+  x.lineJoin = 'round'; rr(x, 432, 200, 330, 470, 20); x.lineWidth = 40; x.strokeStyle = gv(.07); x.stroke();
+  rr(x, 414, 182, 366, 506, 36); x.lineWidth = 2; x.strokeStyle = gv(.38, .7); x.stroke();
+  x.fillStyle = gv(.09); x.beginPath(); x.moveTo(300, 720); x.lineTo(662, 720); x.lineTo(775, 648); x.lineTo(420, 648); x.closePath(); x.fill();
+  x.fillStyle = gv(.04); x.fillRect(300, 720, 362, 42);
+  x.fillStyle = gv(.15); x.beginPath(); x.moveTo(662, 720); x.lineTo(775, 648); x.lineTo(775, 688); x.lineTo(662, 762); x.closePath(); x.fill();
+  x.strokeStyle = gv(.45, .8); x.lineWidth = 2; x.beginPath(); x.moveTo(300, 720); x.lineTo(662, 720); x.lineTo(775, 648); x.stroke();
+  acrylic(300, 772, 112, 380, 1); acrylic(560, 772, 100, 380, 1);
+  lowNoise(x, 1000, 1300, 30, .12, 16, 11);
+  return finish(c, 1, .12);
+}
+function paintGown() {
+  const [c, x] = mk(1000, 1250), r = rnd(5);
+  x.fillStyle = lin(x, 0, 0, 0, 1250, [[0,.2],[.55,.3],[.8,.36],[1,.42]]); x.fillRect(0, 0, 1000, 1250);
+  x.fillStyle = rad(x, 500, 300, 0, 700, [[0,.42,.7],[1,.2,0]]); x.fillRect(0, 0, 1000, 1250);
+  // arms
+  x.fillStyle = gv(.5); for (const s of [-1, 1]) { x.beginPath(); x.moveTo(500+s*130, 0); x.quadraticCurveTo(500+s*205, 300, 500+s*190, 590); x.lineTo(500+s*160, 600); x.quadraticCurveTo(500+s*165, 300, 500+s*95, 0); x.fill(); }
+  blurDraw(x, 3, () => { x.fillStyle = gv(.56); for (const s of [-1, 1]) { x.beginPath(); x.ellipse(500+s*178, 610, 22, 42, s*.2, 0, 7); x.fill(); } });
+  // gown bell
+  x.save(); x.beginPath(); x.moveTo(400, 0); x.lineTo(600, 0); x.bezierCurveTo(610, 280, 640, 330, 700, 520);
+  x.bezierCurveTo(820, 820, 960, 1000, 1000, 1250); x.lineTo(0, 1250); x.bezierCurveTo(40, 1000, 180, 820, 300, 520); x.bezierCurveTo(360, 330, 390, 280, 400, 0); x.closePath();
+  x.fillStyle = gv(.07); x.fill(); x.clip();
+  for (let i = 0; i <= 110; i++) {
+    const u = i/110, top = 400 + u*200, bot = -60 + u*1120 + Math.sin(i*1.7)*18;
+    x.beginPath(); x.moveTo(top, 260); x.quadraticCurveTo(lerp(top, bot, .5) + Math.sin(i)*30, 800, bot, 1260);
+    x.lineWidth = 4 + r()*10; x.strokeStyle = gv(.03 + r()*.13, .8); x.stroke();
+    if (r() < .35) { x.lineWidth = 1.5; x.strokeStyle = gv(.4, .35); x.stroke(); }
+  }
+  for (let y = 0; y < 300; y += 7) { x.fillStyle = gv(.18, .25); x.fillRect(380, y, 240, 2); }
+  x.restore();
+  blurDraw(x, 20, () => { x.fillStyle = gv(.55, .35); x.fillRect(0, 1180, 1000, 50); });
+  lowNoise(x, 1000, 1250, 40, .15, 10, 7);
+  return finish(c, 2, .3, 12);
+}
+function paintPearls() {
+  const [c, x] = mk(1000, 1000), r = rnd(9);
+  x.fillStyle = gv(.76); x.fillRect(0, 0, 1000, 1000);
+  blurDraw(x, 36, () => { for (let k = 0; k < 9; k++) { x.strokeStyle = gv(k%2 ? .92 : .58, .55); x.lineWidth = 60 + r()*80; x.beginPath(); x.moveTo(-100, k*130 - 200); x.bezierCurveTo(300, k*130 + 60, 600, k*130 - 120, 1100, k*130 + 200); x.stroke(); } });
+  const spots = [[210,330],[410,300],[610,340],[810,310],[240,640],[450,660],[650,620],[840,650]];
+  for (const [px, py] of spots) {
+    const a = (r()-.5)*.8, rx = 62 + r()*16, ry = 86 + r()*18;
+    blurDraw(x, 14, () => { x.fillStyle = gv(.35, .55); x.beginPath(); x.ellipse(px+18, py+30, rx, ry*.9, a, 0, 7); x.fill(); });
+    x.strokeStyle = gv(.66); x.lineWidth = 5; x.beginPath(); x.arc(px+8, py-ry-12, 22, Math.PI*.9, Math.PI*2.1); x.stroke();
+    x.save(); x.translate(px, py); x.rotate(a);
+    x.fillStyle = rad(x, 0, 0, 4, ry*1.05, [[0,1],[.22,.96],[.62,.8],[.9,.62],[1,.5]], -rx*.35, -ry*.4);
+    x.beginPath(); x.ellipse(0, 0, rx, ry, 0, 0, 7); x.fill();
+    x.fillStyle = gv(.86, .45); x.beginPath(); x.ellipse(rx*.2, ry*.25, rx*.5, ry*.35, .4, 0, 7); x.fill();
+    blurDraw(x, 5, () => { x.fillStyle = gv(1, .95); x.beginPath(); x.ellipse(-rx*.32, -ry*.42, rx*.18, ry*.1, -.5, 0, 7); x.fill(); });
+    x.restore();
+  }
+  lowNoise(x, 1000, 1000, 50, .12, 6, 3);
+  return finish(c, 3, .16);
+}
+function paintFlower() {
+  const [c, x] = mk(1000, 1250);
+  x.fillStyle = rad(x, 500, 600, 0, 800, [[0,.74],[1,.5]]); x.fillRect(0, 0, 1000, 1250);
+  const shape = (R, k, ruff, rot) => { x.beginPath(); for (let i = 0; i <= 720; i++) { const th = i/720*Math.PI*2; const rr_ = R*(.5 + .5*Math.pow(Math.abs(Math.cos(k/2*(th+rot))), .6)) + ruff*Math.sin(th*46) + ruff*.6*Math.sin(th*17+1); const X = 500 + rr_*Math.cos(th), Y = 600 + rr_*Math.sin(th); i ? x.lineTo(X, Y) : x.moveTo(X, Y); } x.closePath(); };
+  blurDraw(x, 22, () => { x.save(); x.translate(26, 34); shape(390, 6, 16, .2); x.fillStyle = gv(.25, .6); x.fill(); x.restore(); });
+  const layer = (R, rot, ruff, dark) => {
+    shape(R, 6, ruff, rot); x.fillStyle = rad(x, 500, 600, 20, R*1.05, [[0,dark],[.55,.62],[.85,.86],[1,.93]]); x.fill();
+    x.save(); shape(R, 6, ruff, rot); x.clip();
+    for (let i = 0; i < 140; i++) { const th = i/140*Math.PI*2; x.strokeStyle = gv(i%2 ? .3 : .95, i%2 ? .28 : .22); x.lineWidth = 3; x.beginPath(); x.moveTo(500 + 40*Math.cos(th), 600 + 40*Math.sin(th)); x.lineTo(500 + R*1.1*Math.cos(th+.08), 600 + R*1.1*Math.sin(th+.08)); x.stroke(); }
+    x.restore();
+    shape(R, 6, ruff, rot); x.strokeStyle = gv(.35, .5); x.lineWidth = 2; x.stroke();
+  };
+  layer(390, .2, 16, .22); layer(250, .72, 11, .2); layer(130, .2, 6, .18);
+  x.fillStyle = rad(x, 500, 600, 0, 52, [[0,.62],[1,.16]]); x.beginPath(); x.arc(500, 600, 52, 0, 7); x.fill();
+  lowNoise(x, 1000, 1250, 60, .14, 4, 13);
+  return finish(c, 4, .2, 11);
+}
+function paintInterior() {
+  const [c, x] = mk(1000, 1250);
+  x.fillStyle = lin(x, 0, 0, 1000, 0, [[0,.7],[.3,.8],[1,.76]]); x.fillRect(0, 0, 1000, 1250);
+  x.fillStyle = gv(.66); x.fillRect(0, 0, 150, 900);
+  lowNoise(x, 1000, 900, 26, .28, 20, 21); lowNoise(x, 1000, 900, 120, .1, 2, 22);
+  x.fillStyle = rad(x, 250, 590, 0, 420, [[0,1,.4],[1,1,0]]); x.fillRect(0, 0, 1000, 1250);
+  x.fillStyle = lin(x, 0, 880, 0, 1250, [[0,.66],[1,.8]]); x.fillRect(0, 880, 1000, 370);
+  for (let y = 890; y < 1250; y += 6) { x.fillStyle = gv(.6, .15); x.fillRect(0, y, 1000, 1.5); }
+  blurDraw(x, 26, () => { x.fillStyle = gv(.4, .5); x.fillRect(330, 860, 700, 40); });
+  x.fillStyle = gv(.9); rr(x, 360, 640, 700, 130, 26); x.fill();
+  x.fillStyle = gv(.86); rr(x, 330, 740, 720, 140, 20); x.fill();
+  x.strokeStyle = gv(.7, .7); x.lineWidth = 3; for (const X of [600, 820]) { x.beginPath(); x.moveTo(X, 650); x.lineTo(X, 760); x.stroke(); }
+  x.fillStyle = gv(.95, .6); x.fillRect(340, 745, 700, 4);
+  blurDraw(x, 14, () => { x.fillStyle = gv(.35, .55); x.fillRect(400, 940, 520, 24); });
+  x.fillStyle = gv(.55); x.fillRect(380, 880, 540, 26); x.fillStyle = gv(.42); x.fillRect(380, 906, 540, 30);
+  for (let i = 0; i < 12; i++) { x.fillStyle = gv(.45, .5); x.fillRect(380 + i*45, 884, 30, 2); }
+  for (const [sx, sy, sr] of [[470, 842, 42], [612, 856, 30], [730, 852, 34]]) { x.fillStyle = rad(x, sx, sy, 2, sr, [[0,.92],[1,.5]], -sr*.3, -sr*.35); x.beginPath(); x.ellipse(sx, sy, sr*1.15, sr, 0, 0, 7); x.fill(); }
+  x.fillStyle = gv(.1); x.fillRect(160, 760, 180, 18); x.fillRect(180, 778, 14, 140); x.fillRect(306, 778, 14, 140);
+  x.fillStyle = gv(.07); rr(x, 150, 930, 200, 110, 6); x.fill(); x.fillRect(165, 1040, 30, 120); x.fillRect(305, 1040, 30, 120);
+  x.fillStyle = rad(x, 250, 712, 4, 58, [[0,.4],[1,.1]], -18, -20); x.beginPath(); x.arc(250, 712, 52, 0, 7); x.fill();
+  x.fillStyle = gv(.12); x.fillRect(246, 610, 8, 60);
+  x.fillStyle = gv(.16); x.beginPath(); x.moveTo(160, 612); x.lineTo(340, 612); x.lineTo(296, 548); x.lineTo(204, 548); x.closePath(); x.fill();
+  x.strokeStyle = gv(.13); x.lineWidth = 12; x.strokeRect(610, 360, 76, 104);
+  x.fillStyle = gv(.72); rr(x, -40, 680, 200, 330, 60); x.fill(); lowNoise(x, 200, 1010, 80, .2, 1, 23);
+  return finish(c, 5, .14);
+}
+function paintArch(kind, w, h, seed) {
+  const [c, x] = mk(w, h), r = rnd(seed);
+  const wall = .72 + r()*.12;
+  x.fillStyle = lin(x, 0, 0, w, h, [[0,wall],[1,wall-.12]]); x.fillRect(0, 0, w, h);
+  if (kind === 'stair') {
+    for (let k = 16; k >= 0; k--) { x.strokeStyle = gv(k%2 ? .88 : .62); x.lineWidth = 26; x.beginPath(); x.arc(-40, h*1.05, 180 + k*26, -1.45, -.05); x.stroke(); }
+    x.strokeStyle = gv(.18); x.lineWidth = 4; x.beginPath(); x.arc(-40, h*1.05, 610, -1.35, -.25); x.stroke();
+  } else if (kind === 'room') {
+    x.fillStyle = gv(.46); x.beginPath(); x.moveTo(w*.62, 0); x.lineTo(w, 0); x.lineTo(w, h); x.lineTo(w*.62, h*.8); x.fill();
+    x.fillStyle = gv(.14); x.fillRect(w*.08, h*.55, w*.5, h*.25);
+    x.fillStyle = gv(.86); x.fillRect(w*.66, h*.12, w*.2, h*.5);
+    x.fillStyle = rad(x, w*.3, h*.49, 2, 34, [[0,.9],[1,.5]], -8, -10); x.beginPath(); x.ellipse(w*.3, h*.49, 30, 38, 0, 0, 7); x.fill();
+  } else if (kind === 'door') {
+    x.fillStyle = gv(.24); rr(x, w*.28, h*.12, w*.3, h*.6, [60, 60, 0, 0]); x.fill();
+    x.fillStyle = gv(.5); x.beginPath(); x.moveTo(w*.05, h*.8); x.lineTo(w*.95, h*.76); x.lineTo(w, h*.88); x.lineTo(0, h*.95); x.fill();
+    x.strokeStyle = gv(.1); x.lineWidth = 5; for (const X of [.25, .6]) { x.beginPath(); x.moveTo(w*X, h*.72); x.lineTo(w*X, h*.98); x.moveTo(w*X, h*.8); x.lineTo(w*(X+.1), h*.78); x.lineTo(w*(X+.1), h*.99); x.stroke(); }
+  } else if (kind === 'corridor') {
+    const vx = w*.5, vy = h*.46;
+    x.fillStyle = gv(.3); x.beginPath(); x.moveTo(0, 0); x.lineTo(w, 0); x.lineTo(vx+50, vy-60); x.lineTo(vx-50, vy-60); x.fill();
+    x.fillStyle = gv(.42); x.beginPath(); x.moveTo(0, h); x.lineTo(w, h); x.lineTo(vx+50, vy+60); x.lineTo(vx-50, vy+60); x.fill();
+    for (const s of [-1, 1]) for (let i = 0; i < 7; i++) { const t0 = i/7, t1 = (i+.5)/7; x.fillStyle = gv(i%2 ? .22 : .34); x.beginPath();
+      x.moveTo(vx + s*lerp(w/2, 50, t0), lerp(0, vy-60, t0)); x.lineTo(vx + s*lerp(w/2, 50, t1), lerp(0, vy-60, t1)); x.lineTo(vx + s*lerp(w/2, 50, t1), lerp(h, vy+60, t1)); x.lineTo(vx + s*lerp(w/2, 50, t0), lerp(h, vy+60, t0)); x.fill(); }
+    x.fillStyle = gv(.06); x.fillRect(vx-50, vy-60, 100, 120);
+    blurDraw(x, 10, () => { x.strokeStyle = gv(1, .8); x.lineWidth = 6; for (const s of [-1, 1]) { x.beginPath(); x.moveTo(vx + s*w*.5, h*.98); x.lineTo(vx + s*52, vy+58); x.stroke(); } });
+  } else if (kind === 'shaft') {
+    blurDraw(x, 18, () => { x.fillStyle = gv(1, .75); x.beginPath(); x.moveTo(w*.2, 0); x.lineTo(w*.5, 0); x.lineTo(w*.9, h); x.lineTo(w*.45, h); x.fill(); });
+    x.fillStyle = gv(.55, .6); x.beginPath(); x.moveTo(0, h*.7); x.lineTo(w*.4, h*.62); x.lineTo(w*.4, h); x.lineTo(0, h); x.fill();
+  } else if (kind === 'steps') {
+    for (let i = 0; i < 9; i++) { const y = h*.3 + i*h*.08, X = w*.9 - i*w*.1; x.fillStyle = gv(.86); x.fillRect(0, y, X, h*.02); x.fillStyle = gv(.58); x.fillRect(0, y + h*.02, X, h*.06); }
+    x.fillStyle = gv(.9, .8); x.fillRect(w*.72, 0, w*.28, h*.5);
+  } else if (kind === 'niche') {
+    x.fillStyle = gv(.55); rr(x, w*.2, h*.2, w*.6, h*.45, 10); x.fill();
+    x.fillStyle = gv(.9); rr(x, w*.24, h*.24, w*.52, h*.37, 6); x.fill();
+    x.fillStyle = rad(x, w*.5, h*.6, 2, w*.25, [[0,.95],[1,.6]], 0, -20); x.beginPath(); x.ellipse(w*.5, h*.6, w*.22, h*.05, 0, 0, 7); x.fill();
+  } else if (kind === 'window') {
+    x.fillStyle = gv(.28); x.fillRect(0, 0, w, h);
+    x.fillStyle = gv(.96); x.fillRect(w*.3, h*.06, w*.4, h*.62);
+    x.fillStyle = gv(.28); x.fillRect(w*.49, h*.06, w*.02, h*.62);
+    blurDraw(x, 30, () => { x.fillStyle = gv(.9, .6); x.beginPath(); x.moveTo(w*.3, h*.7); x.lineTo(w*.7, h*.7); x.lineTo(w*.95, h); x.lineTo(w*.05, h); x.fill(); });
+  } else if (kind === 'arch') {
+    for (let i = 4; i >= 0; i--) { const s = 1 - i*.17; x.fillStyle = gv(i%2 ? .5 : .82); rr(x, w*(.5 - .38*s), h*(.9 - .8*s), w*.76*s, h*.8*s + 4, [w*.38*s, w*.38*s, 0, 0]); x.fill(); }
+  } else {
+    x.fillStyle = gv(.9); x.fillRect(0, 0, w*.55, h);
+    x.fillStyle = gv(.4, .7); x.beginPath(); x.moveTo(w*.55, 0); x.lineTo(w, h*.2); x.lineTo(w, h); x.lineTo(w*.55, h*.85); x.fill();
+    x.fillStyle = gv(.2); x.fillRect(w*.62, h*.35, w*.18, h*.08);
+  }
+  lowNoise(x, w, h, 24, .2, 12, seed+1);
+  return finish(c, seed, .25, 10);
+}
+
+/* ---------------- fonts + measure ---------------- */
+const meas = el('span', 'word', stage); meas.style.cssText = 'position:absolute;visibility:hidden;left:-9999px';
+function measure(text, size, weight=450, family='Inter') { meas.style.fontSize = size + 'px'; meas.style.fontWeight = weight; meas.style.fontFamily = family; meas.textContent = text; return meas.getBoundingClientRect().width; }
+
+/* ---------------- Line: words + pills that rise in and re-center ---------------- */
+function Line(parent, spec, o) {
+  const { size, cy, cx = W/2, gap, pillPadX, pillH, pillR, rise = size*.85 } = o;
+  const items = spec.map(s => {
+    const it = { ...s };
+    if (s.pill) {
+      it.w = measure(s.pill, size, 470) + pillPadX*2 + 2;
+      it.h = pillH;
+      it.e = el('div', 'pill abs', parent); it.e.style.cssText += `;width:${it.w}px;height:${pillH}px;border-radius:${pillR}px;font-size:${size}px`;
+      it.span = el('span', '', it.e, s.pill);
+    } else {
+      it.w = measure(s.text, size); it.h = size*1.2;
+      it.e = el('div', 'word abs', parent, s.text); it.e.style.fontSize = size + 'px'; it.e.style.lineHeight = it.h + 'px';
+    }
+    it.g = s.gap ?? gap;
+    return it;
+  });
+  function render(t) {
+    const f = items.map(it => P(t, it.tin, .62, EO) * (it.tout != null ? 1 - P(t, it.tout, .62, EIO) : 1));
+    let total = 0;
+    items.forEach((it, i) => { total += it.w*f[i]; if (i) total += it.g*Math.min(f[i-1], f[i]); });
+    let xx = cx - total/2;
+    items.forEach((it, i) => {
+      if (i) xx += it.g*Math.min(f[i-1], f[i]);
+      const pin = P(t, it.tin, .55, EO), oin = P(t, it.tin, .14, LIN);
+      const oout = it.tout != null ? 1 - P(t, it.tout, .22, LIN) : 1;
+      const vis = t >= it.tin && oout > 0;
+      it.e.style.visibility = vis ? 'visible' : 'hidden';
+      if (vis) {
+        if (it.pill) {
+          const pb = P(t, it.tin, .5, EO);
+          tf(it.e, xx + 70*(1-pb), cy - it.h/2 + rise*.55*(1-pb), 1, Math.min(P(t, it.tin, .12, LIN), oout));
+          const q = P(t, it.tin + .14, .42, EO);
+          it.span.style.transform = `translateY(${size*.55*(1-q)}px)`; it.span.style.filter = `blur(${(1-q)*9}px)`; it.span.style.opacity = P(t, it.tin + .1, .2, LIN);
+        } else {
+          tf(it.e, xx, cy - it.h/2 + rise*(1-pin) + (it.dy||0), 1, Math.min(oin, oout));
+        }
+      }
+      xx += it.w*f[i];
+    });
+  }
+  return { items, render };
+}
+
+/* ---------------- build ---------------- */
+async function build() {
+  await document.fonts.load('450 46px Inter'); await document.fonts.load('500 120px Archivo'); await document.fonts.ready;
+
+  const IM = { chair: paintChair(), gown: paintGown(), pearls: paintPearls(), flower: paintFlower(), interior: paintInterior() };
+  const kinds = [['stair',400,470],['room',400,420],['door',400,500],['corridor',400,430],['shaft',400,480],['niche',400,440],['window',400,500],['steps',400,430],['arch',400,470],['plane',400,450],['corridor',400,480],['room',400,460],['door',400,440],['stair',400,420]];
+  const GRID = kinds.map(([k, w, h], i) => paintArch(k, w, h, 100 + i*17));
+  const urls = {};
+  async function toURL(c) { const b = await new Promise(r => c.toBlob(r, 'image/jpeg', .92)); const u = URL.createObjectURL(b); const im = new Image(); im.src = u; await im.decode(); return u; }
+  for (const k in IM) urls[k] = await toURL(IM[k]);
+  const gridUrls = []; for (const c of GRID) gridUrls.push(await toURL(c));
+  const bg = (e, u, size='cover', pos='50% 50%') => { e.style.backgroundImage = `url(${u})`; e.style.backgroundSize = size; e.style.backgroundPosition = pos; };
+
+  const S = {}; ['A','B','C','D','E'].forEach(k => S[k] = el('div', 'scene', stage));
+  const Sp = el('div', 'scene', stage);
+
+  /* A — "What if we had [more context] ?" */
+  const lineA = Line(S.A, [
+    { text: 'What', tin: .08, tout: 2.06 }, { text: 'if', tin: .24, tout: 2.13 }, { text: 'we', tin: .56, tout: 2.20 }, { text: 'had', tin: .72, tout: 2.27 },
+    { pill: 'more context', tin: 1.50, gap: 16 }, { text: '?', tin: 1.84, tout: 2.46, gap: 16, dy: 4 },
+  ], { size: 46, cy: 540, gap: 13, pillPadX: 20, pillH: 66, pillR: 18 });
+
+  /* B — label/image row */
+  const K = 0.84;
+  const rowSpec = [
+    { label: 'Artist', tin: 3.64 }, { img: 'pearls', w: 240, h: 236, tin: 4.00 }, { label: 'Year', tin: 3.36 }, { img: 'gown', w: 290, h: 356, tin: 3.42 },
+    { label: 'Location', tin: 3.28 }, { img: 'chair', w: 320, h: 420, tin: 3.28, hero: true }, { label: 'Object', tin: 3.28 }, { img: 'flower', w: 280, h: 350, tin: 3.42 },
+    { label: 'Brand', tin: 3.36 }, { img: 'interior', w: 200, h: 246, tin: 4.00 }, { label: '& more', tin: 3.64 },
+  ].map(s => {
+    if (s.img) { s.w *= K; s.h *= K; s.e = el('div', 'img abs', S.B); s.e.style.cssText += `;width:${s.w}px;height:${s.h}px;transform-origin:50% 50%`; bg(s.e, urls[s.img]); s.slot = s.w; }
+    else { s.tw = measure(s.label, 44); s.e = el('div', 'word abs', S.B, s.label); s.e.style.cssText += ';font-size:44px;line-height:52px;z-index:2'; s.slot = s.tw*.52; }
+    return s;
+  });
+  const kicks = []; for (let b = 0; b < 6; b++) for (const k of [0, 1, 2, 3.5]) kicks.push(3.28 + b*2.32 + k*.58);
+  const kickEnv = t => { let v = 0; for (const k of kicks) if (t >= k) v = Math.exp(-(t-k)/.14); return v; };
+  function renderRow(t) {
+    const f = rowSpec.map(s => P(t, s.tin, .6, EO));
+    const G = 18;
+    let total = 0; rowSpec.forEach((s, i) => { total += s.slot*f[i] + (i ? G*Math.min(f[i], f[i-1]) : 0); });
+    let xx = W/2 - total/2;
+    const ex = P(t, 5.34, .3, EI);
+    const kb = kickEnv(t);
+    rowSpec.forEach((s, i) => {
+      if (i) xx += G*Math.min(f[i], f[i-1]);
+      const vis = t >= s.tin; show(s.e, vis);
+      if (vis) {
+        const cxx = xx + s.slot*f[i]/2;
+        if (s.img) {
+          let sc = lerp(.55, 1, P(t, s.tin, .5, EO)) * (1 + .028*kb*(i%4 ? 1 : .6));
+          sc *= s.hero ? lerp(1, 1.22, ex) : lerp(1, .94, ex);
+          tf(s.e, cxx - s.w/2, 540 - s.h/2, sc, P(t, s.tin, .1, LIN));
+        } else {
+          const p = P(t, s.tin, .5, EO);
+          tf(s.e, cxx - s.tw/2, 540 - 26 + 24*(1-p) + 60*ex, 1, P(t, s.tin, .12, LIN) * (1 - ex));
+        }
+      }
+      xx += s.slot*f[i];
+    });
+  }
+
+  /* C — detail card + captions + buttons */
+  const card = el('div', 'img abs', S.C);
+  const capOpts = { size: 26, gap: 8, pillPadX: 11, pillH: 42, pillR: 10, rise: 18 };
+  const L1y = 536, L2y = 584;
+  const items = [
+    { img: 'chair', t0: 5.64, t1: 7.56, animated: true,
+      l1: [{ text: 'Tidal Chair by', tin: 5.72 }, { pill: 'Halden Studio', tin: 5.84 }, { text: '(2024)', tin: 6.00 }],
+      l2: [{ text: 'Photo by', tin: 6.28 }, { pill: 'M. Arlo', tin: 6.36 }] },
+    { img: 'gown', t0: 7.56, t1: 8.12, l1: [{ text: 'The Indigo Gown shown by' }, { pill: 'Noor Vale' }], l2: [{ text: 'during' }, { pill: 'Milan Fashion Week' }, { text: '(2019)' }] },
+    { img: 'pearls', t0: 8.12, t1: 8.36, l1: [{ text: 'Earrings from the “Tidewater” collection by' }, { pill: 'Lune Atelier' }], l2: [{ text: 'Designed in' }, { pill: 'Lisbon, Portugal' }] },
+    { img: 'flower', t0: 8.36, t1: 8.76, l1: [{ text: 'Photograph from' }, { pill: 'Forms of Water' }], l2: [{ text: '(1931) by' }, { pill: 'Edda Marlowe' }] },
+    { img: 'interior', t0: 8.76, t1: 9.62, l1: [{ text: 'The' }, { pill: 'Fjord House Studio' }, { text: 'in Oslo, Norway.' }], l2: [{ text: 'Designed by' }, { pill: 'Sana Irving' }] },
+  ];
+  items.forEach(it => {
+    it.g = el('div', 'abs', S.C); it.g.style.cssText += ';width:1920px;height:1080px';
+    const fix = a => a.map(s => ({ ...s, tin: s.tin ?? it.t0 - 5 }));
+    it.L1 = Line(it.g, fix(it.l1), { ...capOpts, cy: L1y }); it.L2 = Line(it.g, fix(it.l2), { ...capOpts, cy: L2y });
+  });
+  const ICON = {
+    share: c => `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>`,
+    plus: c => `<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+    more: c => `<svg width="30" height="30" viewBox="0 0 24 24" fill="${c}"><circle cx="6" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18" cy="12" r="1.8"/></svg>`,
+  };
+  const btns = [
+    { e: el('div', 'cbtn abs', S.C, ICON.share('#fff')), w: 92, h: 92, x: 960-180, tin: 9.04 },
+    { e: el('div', 'cbtn abs', S.C, ICON.plus('#0B1F4B')), w: 232, h: 80, x: 960, tin: 9.20 },
+    { e: el('div', 'cbtn abs', S.C, ICON.more('#fff')), w: 92, h: 92, x: 960+180, tin: 9.36 },
+  ];
+  btns.forEach((b, i) => { b.e.style.cssText += `;width:${b.w}px;height:${b.h}px;background:${i === 1 ? '#fff' : 'var(--ink)'};${i === 1 ? 'border:1px solid var(--pill-line);box-shadow:0 6px 18px -10px rgba(11,31,75,.25)' : ''}`; });
+
+  function renderDetail(t) {
+    const cur = items.find(it => t >= it.t0 && t < it.t1) || items[items.length-1];
+    items.forEach(it => { disp(it.g, it === cur); if (it === cur) { it.L1.render(t); it.L2.render(t); } });
+    let w = 860, h = 540, top = -60, bs = 100, by = 50;
+    if (cur.img === 'chair') {
+      const p = P(t, 5.64, .55, EO);
+      w = lerp(620, 860, p); h = lerp(560, 540, p); top = lerp(-10, -60, p); bs = lerp(100, 116, p); by = lerp(30, 88, p);
+      by += (t - 6.2)*1.2*(t > 6.2);
+    } else if (cur.img === 'interior') {
+      const m = P(t, 9.26, .3, EIO); w = lerp(860, 600, m); h = lerp(540, 600, m); top = lerp(-60, -120, m); by = lerp(64, 30, m);
+    } else if (cur.img === 'gown') { by = 40; } else if (cur.img === 'flower') { by = 45; }
+    card.style.width = w + 'px'; card.style.height = h + 'px';
+    bg(card, urls[cur.img], `${bs}% auto`, `50% ${by}%`);
+    tf(card, 960 - w/2, top);
+    btns.forEach(b => { const p = P(t, b.tin, .45, BACK), vis = t >= b.tin; show(b.e, vis); if (vis) tf(b.e, b.x - b.w/2, 800 - b.h/2 + 34*(1 - P(t, b.tin, .4, EO)), lerp(.4, 1, p), P(t, b.tin, .08, LIN)); });
+  }
+
+  /* Phone */
+  const phone = el('div', 'abs', Sp); phone.id = 'phone'; phone.style.transformOrigin = '50% 50%';
+  const statusHTML = `<div class="ph-status"><span>11:11</span><span class="ic"><svg width="20" height="13" viewBox="0 0 20 13" fill="#fff"><rect x="0" y="9" width="3.4" height="4" rx="1"/><rect x="5.3" y="6" width="3.4" height="7" rx="1"/><rect x="10.6" y="3" width="3.4" height="10" rx="1"/><rect x="15.9" y="0" width="3.4" height="13" rx="1" opacity=".35"/></svg><svg width="18" height="13" viewBox="0 0 18 13" fill="#fff"><path d="M9 13l2.6-3.2a4 4 0 0 0-5.2 0z"/><path d="M9 5.5a7 7 0 0 1 4.6 1.7l1.6-2A9.6 9.6 0 0 0 9 3a9.6 9.6 0 0 0-6.2 2.2l1.6 2A7 7 0 0 1 9 5.5z"/><path d="M9 0a13 13 0 0 1 8.5 3.1L18 2.4A14 14 0 0 0 0 2.4l.5.7A13 13 0 0 1 9 0z" opacity=".95"/></svg><span class="bat">92</span></span></div>`;
+  const vA = el('div', 'layer', phone, statusHTML + `
+    <svg style="position:absolute;left:24px;top:92px" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>
+    <div style="position:absolute;left:50%;top:88px;transform:translateX(-50%);height:36px;padding:0 12px 0 8px;border:1px solid rgba(255,255,255,.18);border-radius:999px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600">
+      <span style="width:20px;height:20px;border-radius:50%;background:#DCE5FB"></span><span style="width:20px;height:20px;border-radius:50%;background:#2457F5;margin-left:-12px;border:2px solid var(--ui)"></span>+08</div>
+    <div style="position:absolute;left:0;right:0;top:146px;text-align:center;font-size:13px;color:var(--ui-mute)">instagram.com</div>`);
+  const phImg = el('div', 'img abs', vA); phImg.style.cssText += ';width:440px;height:488px;top:172px'; bg(phImg, urls.interior, '100% auto', '50% 30%');
+  const phDim = el('div', 'abs', vA); phDim.style.cssText += ';width:440px;height:950px;background:#020816;opacity:0';
+  const phCap = el('div', 'abs', vA); phCap.style.cssText += ';width:440px;top:686px';
+  el('div', 'ph-cap', phCap, 'The <b>Fjord House Studio</b> in Oslo, Norway.').style.top = '0px';
+  const capL2 = el('div', 'ph-cap', phCap, 'Designed by <b id="tapTarget">Sana Irving</b>'); capL2.style.top = '28px';
+  const phBtns = el('div', 'abs', vA, `
+    <div class="cbtn" style="position:absolute;left:102px;top:0;width:48px;height:48px;background:var(--ui-2)">${ICON.share('#fff').replace(/30/g, '20')}</div>
+    <div class="cbtn" style="position:absolute;left:158px;top:0;width:124px;height:48px;background:#fff">${ICON.plus('#06112B').replace(/30/g, '22')}</div>
+    <div class="cbtn" style="position:absolute;left:290px;top:0;width:48px;height:48px;background:var(--ui-2)">${ICON.more('#fff').replace(/30/g, '20')}</div>`);
+  phBtns.style.cssText += ';top:778px;width:440px';
+  const strip = el('div', 'abs', vA); strip.style.cssText += ';top:846px;left:16px;width:408px;height:120px;display:flex;gap:8px';
+  [2, 9].forEach(i => { const d = el('div', 'img', strip); d.style.cssText = 'flex:1;height:120px;border-radius:4px'; bg(d, gridUrls[i]); });
+  el('div', 'abs', vA).style.cssText += ';top:926px;left:150px;width:140px;height:5px;border-radius:3px;background:#fff';
+  const cursor = el('div', 'abs', Sp); cursor.style.cssText += ';width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.55);border:2px solid rgba(255,255,255,.9);box-shadow:0 2px 10px rgba(0,0,0,.25);z-index:5';
+
+  const vB = el('div', 'layer', phone, statusHTML + `
+    <svg style="position:absolute;left:14px;top:106px" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg>
+    <div style="position:absolute;left:40px;top:92px;width:352px;height:50px;border-radius:14px;background:var(--ui-2)"></div>
+    <svg style="position:absolute;left:356px;top:106px" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8395C2" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="9" r="1.3" fill="#8395C2"/><circle cx="15" cy="9" r="1.3" fill="#8395C2"/><circle cx="8" cy="14" r="1.3" fill="#8395C2"/></svg>
+    <svg style="position:absolute;left:404px;top:106px" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    <span class="tab" style="left:30px;color:#fff">Elements</span><span class="tab" style="left:188px">Clusters</span><span class="tab" style="left:342px">People</span>
+    <div style="position:absolute;left:0;right:0;top:214px;height:1px;background:rgba(255,255,255,.1)"></div>
+    <div style="position:absolute;left:18px;top:212px;width:112px;height:2px;background:#fff"></div>`);
+  const typed = el('div', 'abs', vB); typed.style.cssText += ';left:60px;top:104px;font-size:17px;font-weight:470;color:#fff;white-space:pre';
+  const gridWrap = el('div', 'abs', vB); gridWrap.style.cssText += ';top:216px;left:0;width:440px;height:734px;overflow:hidden';
+  const gridIn = el('div', 'abs', gridWrap); gridIn.style.width = '440px';
+  const colY = [4, 4], gridEls = [];
+  kinds.forEach(([k, w, h], i) => {
+    const col = colY[0] <= colY[1] ? 0 : 1, gw = 216, gh = Math.round(h*gw/w);
+    const d = el('div', 'img abs', gridIn); d.style.cssText += `;width:${gw}px;height:${gh}px;`; bg(d, gridUrls[i]);
+    gridEls.push({ e: d, x: col ? 224 : 0, y: colY[col], row: colY[col] < 250 ? 0 : colY[col] < 520 ? 1 : 2 });
+    colY[col] += gh + 8;
+  });
+  const nav = el('div', 'abs', vB, `<div style="display:flex;justify-content:space-around;align-items:center;height:64px;padding:0 20px">
+    ${['<path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/>', '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>', '<path d="M12 5v14M5 12h14"/>', '<path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/>'].map(p => `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#C9D3EE" stroke-width="1.8" stroke-linejoin="round">${p}</svg>`).join('')}
+    <span style="width:26px;height:26px;border-radius:50%;background:#DCE5FB;border:2px solid #fff"></span></div>`);
+  nav.style.cssText += ';top:858px;width:440px;height:92px;background:linear-gradient(to bottom,rgba(6,17,43,.0),var(--ui) 30%)';
+
+  const tapEl = () => document.getElementById('tapTarget');
+  const QUERY = 'Sana Irving';
+  function phoneCam(t) {
+    // [scale, center-y] keyframes of the phone "camera"
+    if (t < 9.46) return [1.9, 360];
+    if (t < 10.64) { const p = P(t, 9.46, .62, EO); const d = clamp((t-10.08)/.56); return [lerp(1.9, .94, p) - .03*d, lerp(360, 540, p)]; }
+    if (t < 12.40) { const p = P(t, 10.64, .3, EIO); return [lerp(.91, 1.3, p) + .025*clamp((t-10.94)/1.46), lerp(540, 347, p)]; }
+    if (t < 14.25) { const p = P(t, 12.40, .6, EO); return [lerp(1.325, 1.0, p), lerp(347, 560, p)]; }
+    const p = P(t, 14.25, 1.05, EIO); return [lerp(1.0, .8, p), lerp(560, 540, p)];
+  }
+  function renderPhone(t) {
+    const [s, cy] = phoneCam(t);
+    tf(phone, 960 - 220, cy - 475, s, P(t, 9.46, .12, LIN));
+    const b = t >= 12.40; disp(vA, !b); disp(vB, b);
+    if (!b) {
+      phDim.style.opacity = P(t, 12.12, .24, EIO) * .92;
+      phCap.style.opacity = 1 - P(t, 12.04, .1, LIN);
+      const tg = tapEl();
+      tg.style.background = t > 11.9 && t < 12.1 ? '#2457F5' : '';
+      const on = t >= 11.1 && t < 12.12; show(cursor, on);
+      if (on) {
+        const ox = 960 - 220*s, oy = cy - 475*s;
+        const tx = ox + (tg.offsetLeft + tg.offsetWidth*.62)*s, ty = oy + (686 + 28 + 10)*s;
+        const m = P(t, 11.1, .4, EIO);
+        const px = lerp(tx + 40, tx, m), py = lerp(ty + 56, ty, m);
+        const press = t > 11.88 ? 1 - .25*Math.sin(clamp((t-11.88)/.18)*Math.PI) : 1;
+        tf(cursor, px - 18, py - 18, press, P(t, 11.1, .1, LIN) * (1 - P(t, 12.02, .1, LIN)));
+      }
+    } else {
+      show(cursor, false);
+      const n = Math.round(clamp((t - 12.64)/.24) * QUERY.length);
+      typed.textContent = QUERY.slice(0, n);
+      const rowT = [12.96, 13.08, 13.20];
+      gridEls.forEach(g => { const p = P(t, rowT[g.row], .45, EO); tf(g.e, g.x, g.y + 14*(1-p), lerp(.97, 1, p), P(t, rowT[g.row], .16, LIN)); });
+      const sc = EI(clamp((t - 13.5)/1.0))*.45 + EIO(clamp((t - 13.5)/1.75))*.55;
+      tf(gridIn, 0, -980*sc);
+    }
+  }
+
+  /* D — "Now live on [cadie.so]" */
+  const lineD = Line(S.D, [{ text: 'Now', tin: 15.32 }, { text: 'live', tin: 15.48 }, { text: 'on', tin: 15.60 }, { pill: 'cadie.so', tin: 15.96, gap: 16 }],
+    { size: 46, cy: 540, gap: 13, pillPadX: 20, pillH: 66, pillR: 18 });
+
+  /* E — logo */
+  const LOGO = 'CADIE', LS = 128;
+  const logoEls = [...LOGO].map(ch => { const e = el('div', 'abs', S.E, ch); e.style.cssText += `;font-family:Archivo;font-stretch:112%;font-variation-settings:"wdth" 112;font-weight:520;font-size:${LS}px;line-height:1;color:var(--blue);letter-spacing:-.02em`; return e; });
+  const reg = el('div', 'abs', S.E, '®'); reg.style.cssText += ';font-family:Archivo;font-weight:500;font-size:30px;color:var(--blue)';
+  await document.fonts.load(`520 ${LS}px Archivo`);
+  const widths = logoEls.map(e => e.getBoundingClientRect().width);
+  const totalW = widths.reduce((a, b) => a + b, 0) + 34;
+  function renderLogo(t) {
+    let xx = 960 - totalW/2;
+    logoEls.forEach((e, i) => { const t0 = 17.76 + i*.045, p = P(t, t0, .55, EO); tf(e, xx, 540 - LS*.56 + LS*.55*(1-p), 1, P(t, t0, .1, LIN)); xx += widths[i]; });
+    const p = P(t, 17.98, .5, EO); tf(reg, xx + 6, 540 - LS*.42 + 30*(1-p), 1, P(t, 17.98, .12, LIN));
+  }
+
+  /* master render */
+  function render(t) {
+    t = clamp(t, 0, DUR);
+    const a = t < 3.28, b = t >= 3.28 && t < 5.64, c = t >= 5.64 && t < 9.62, p = t >= 9.46 && t < 15.30, d = t >= 15.30 && t < 17.76, e = t >= 17.76;
+    disp(S.A, a); disp(S.B, b); disp(S.C, c); disp(Sp, p); disp(S.D, d); disp(S.E, e);
+    if (a) lineA.render(t);
+    if (b) renderRow(t);
+    if (c) {
+      renderDetail(t);
+      if (t >= 9.46) { const [s, cy] = phoneCam(t); const k = s/1.9; S.C.style.transformOrigin = '960px 360px'; S.C.style.transform = `translateY(${cy - 360}px) scale(${k})`; S.C.style.opacity = 1 - P(t, 9.5, .1, LIN); }
+      else { S.C.style.transform = ''; S.C.style.opacity = 1; }
+    }
+    if (p) renderPhone(t);
+    if (d) lineD.render(t);
+    if (e) renderLogo(t);
+  }
+  return render;
+}
+
+/* ---------------- playback ---------------- */
+const au = document.getElementById('au'), playBtn = document.getElementById('play'), scrub = document.getElementById('scrub'), timeEl = document.getElementById('time'), big = document.getElementById('bigplay');
+function fit() { const vp = document.getElementById('viewport').getBoundingClientRect(); const s = CAPTURE ? 1 : Math.min(vp.width/W, vp.height/H); stage.style.transform = `translate(${(vp.width - W*s)/2}px,${(vp.height - H*s)/2}px) scale(${s})`; }
+addEventListener('resize', fit); fit();
+
+build().then(render => {
+  window.renderAt = t => new Promise(r => { render(t); requestAnimationFrame(() => requestAnimationFrame(r)); });
+  window.__ready = true;
+  render(0);
+  if (CAPTURE) return;
+  let playing = false, clock = 0, last = 0;
+  const setUI = () => { playBtn.textContent = playing ? 'Pause' : 'Play'; big.style.display = playing || clock > 0 ? 'none' : 'flex'; };
+  function play() { if (clock >= DUR - .01) clock = 0; au.currentTime = clock; au.play().catch(() => {}); playing = true; last = performance.now(); setUI(); }
+  function pause() { au.pause(); playing = false; setUI(); }
+  playBtn.onclick = () => playing ? pause() : play();
+  big.onclick = play;
+  addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); playing ? pause() : play(); } });
+  scrub.oninput = () => { clock = +scrub.value; au.currentTime = clock; render(clock); timeEl.textContent = `${clock.toFixed(2)} / 20.00`; setUI(); };
+  (function tick(now) {
+    if (playing) {
+      clock = !au.paused && au.readyState >= 2 ? au.currentTime : clock + (now - last)/1000;
+      last = now;
+      if (clock >= DUR) { clock = DUR; pause(); }
+      render(clock); scrub.value = clock; timeEl.textContent = `${clock.toFixed(2)} / 20.00`;
+    }
+    requestAnimationFrame(tick);
+  })(performance.now());
+});
+})();
+</script>
+</body>
+</html>
