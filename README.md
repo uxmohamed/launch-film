@@ -31,6 +31,7 @@ Or call it directly with `/launch-film`.
 | `references/numbers.md` | Easing, durations, scale, blur and type size, by mode |
 | `references/cases/` | 59 shot-by-shot film breakdowns and cross-film comparisons |
 | `templates/storyboard.md` | Fill this in before animating |
+| `examples/recreation-veryfront/` | A complete shot-by-shot recreation of one case film, mapped frame by frame |
 | `examples/` | A working 20 s film engine, a frame-accurate renderer, a contact-sheet slicer |
 
 Rendering to MP4 needs Node.js with `playwright-core`, a Chromium binary and ffmpeg. The films also play directly in a browser.

@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relay Film</title>
+<!--
+  Shot-by-shot recreation of the Veryfront case (references/cases/Veryfront.md), rebuilt with a fictional brand ("Relay").
+  Each block below is labelled with the case's frame range (#n at ~0.5 s per frame).
+  Techniques: logo-as-mask wordmark · brand dot → circle-reveal chapter card · chaos → order tile fly-in · depth-of-field selection ·
+  hero cursor · click-direction bloom · wizard card with in-place body swaps · hot-text typing · chapter card → icon collapse ·
+  input → composer expansion · 8× zoom punch · shimmer status · blur-in result · palindrome outro.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=block" rel="stylesheet">
+<style>
+:root{ --grey:#eceae6; --azure:#0a9df2; --ink:#2b2b2b; --muted:#8a8a8a; --page:#e4e4e4; --chrome:#202020; --chrome-mute:#6b6b6b; --chrome-line:rgba(0,0,0,.12); }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --page:#0d0d0d; --chrome:#eee; --chrome-mute:#999; --chrome-line:rgba(255,255,255,.14);} }
+:root[data-theme="dark"]{ --page:#0d0d0d; --chrome:#eee; --chrome-mute:#999; --chrome-line:rgba(255,255,255,.14); }
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--page);font-family:Outfit,system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden;color:var(--chrome)}
+#viewport{flex:1;position:relative;overflow:hidden;min-height:0}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;background:var(--grey);overflow:hidden;transform-origin:0 0;color:var(--ink);font-family:Outfit;-webkit-font-smoothing:antialiased}
+.abs{position:absolute;left:0;top:0;will-change:transform,opacity,filter}
+.layer{position:absolute;inset:0}
+.cam{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}
+.sphere{border-radius:50%;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.55),rgba(255,255,255,0) 45%),linear-gradient(135deg,#ff5fa2 0%,#ff9d57 34%,#35d0c3 66%,#2f7dff 100%)}
+.card{background:#fff;border-radius:22px;box-shadow:0 1px 2px rgba(0,0,0,.04),0 30px 60px -30px rgba(0,0,0,.14)}
+.tile{display:flex;align-items:center;gap:24px;padding:0 38px;font-size:42px;font-weight:500;white-space:nowrap}
+.ic{flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.pill{border-radius:999px;display:flex;align-items:center;justify-content:center;white-space:nowrap}
+.row{display:flex;align-items:center;gap:24px;height:96px;padding:0 28px;font-size:40px;border-radius:14px;position:absolute;left:0;right:0}
+#controls{flex:none;display:flex;align-items:center;gap:14px;padding:12px 16px;border-top:1px solid var(--chrome-line);font-size:13px;color:var(--chrome-mute)}
+#controls button{font:inherit;font-weight:600;color:var(--chrome);background:transparent;border:1px solid var(--chrome-line);border-radius:999px;padding:7px 16px;cursor:pointer;min-width:84px}
+#scrub{flex:1;accent-color:#0a9df2;min-width:60px}
+#time{font-variant-numeric:tabular-nums;min-width:60px;text-align:right}
+body.capture #controls{display:none}
+</style>
+</head>
+<body>
+<div id="viewport"><div id="stage"></div></div>
+<div id="controls"><button id="play">Play</button><input id="scrub" type="range" min="0" max="30.5" step="0.01" value="0" aria-label="Scrub timeline"><span id="time">0.00</span></div>
+<script>
+(async () => {
+'use strict';
+const W = 1920, H = 1080, DUR = 30.5;
+const stage = document.getElementById('stage');
+const CAPTURE = new URLSearchParams(location.search).has('capture');
+if (CAPTURE) document.body.classList.add('capture');
+
+/* ---------- easing (see references/numbers.md) ---------- */
+function bezier(x1, y1, x2, y2) {
+  const cx = 3*x1, bx = 3*(x2-x1)-cx, ax = 1-cx-bx, cy = 3*y1, by = 3*(y2-y1)-cy, ay = 1-cy-by;
+  const sx = t => ((ax*t+bx)*t+cx)*t, sy = t => ((ay*t+by)*t+cy)*t, dx = t => (3*ax*t+2*bx)*t+cx;
+  return x => { if (x <= 0) return 0; if (x >= 1) return 1; let t = x;
+    for (let i = 0; i < 8; i++) { const e = sx(t)-x; if (Math.abs(e) < 1e-5) break; const d = dx(t); if (Math.abs(d) < 1e-6) break; t -= e/d; }
+    return sy(Math.min(1, Math.max(0, t))); };
+}
+const EO = bezier(.16,1,.3,1), EIO = bezier(.65,0,.35,1), EI = bezier(.55,0,1,.45), BACK = bezier(.34,1.56,.64,1), LIN = x => Math.min(1, Math.max(0, x));
+const clamp = (v, a=0, b=1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, p) => a + (b-a)*p;
+const P = (t, t0, d, e=EO) => e(clamp((t-t0)/d));
+const within = (t, a, b) => t >= a && t < b;
+
+/* ---------- dom ---------- */
+function el(tag, cls, parent, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; (parent||stage).appendChild(e); return e; }
+function tf(e, x, y, s=1, o=1, extra='') { e.style.transform = `translate3d(${x}px,${y}px,0) scale(${s}) ${extra}`; e.style.opacity = o; }
+function show(e, v) { e.style.display = v ? '' : 'none'; }
+function blur(e, px) { e.style.filter = px > .05 ? `blur(${px}px)` : 'none'; }
+function size(e, w, h) { e.style.width = w + 'px'; e.style.height = h + 'px'; }
+function cam(c, s, fx, fy, cx=W/2, cy=H/2) { c.style.transform = `translate(${cx - fx*s}px,${cy - fy*s}px) scale(${s})`; }
+await document.fonts.load('500 40px Outfit'); await document.fonts.load('400 40px Outfit'); await document.fonts.load('600 40px Outfit'); await document.fonts.ready;
+const meas = el('span', '', stage); meas.style.cssText = 'position:absolute;left:-9999px;visibility:hidden;white-space:pre;font-family:Outfit';
+const mw = (t, s, w=500) => { meas.style.fontSize = s + 'px'; meas.style.fontWeight = w; meas.textContent = t; return meas.getBoundingClientRect().width; };
+
+/* ---------- shared pieces ---------- */
+const CURSOR = `<svg width="200" height="200" viewBox="0 0 64 64"><defs><linearGradient id="cg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5cc8ff"/><stop offset="1" stop-color="#0a8fe6"/></linearGradient><filter id="cs" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#0a4f80" flood-opacity=".28"/></filter></defs><path d="M10 8 L56 30 L33 36 L25 58 Z" fill="url(#cg)" stroke="#fff" stroke-width="3.2" stroke-linejoin="round" filter="url(#cs)"/><path d="M15 15 L46 30 L31 34" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width="2" stroke-linejoin="round"/></svg>`;
+let curN = 0; // unique gradient/filter ids per cursor: a shared id inside a hidden scene makes Chrome drop the fill
+const mkCursor = parent => { const k = ++curN; const c = el('div', 'abs', parent, CURSOR.replace(/id="cg"/, `id="cg${k}"`).replace(/url\(#cg\)/, `url(#cg${k})`).replace(/id="cs"/, `id="cs${k}"`).replace(/url\(#cs\)/, `url(#cs${k})`)); c.style.zIndex = 50; c.style.transformOrigin = '30px 25px'; return c; };
+const AGENT_GLYPH = s => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="1.2 3.1"><rect x="5" y="5" width="14" height="14" rx="3.5"/></svg>`;
+const agentOrb = (parent, d) => { const o = el('div', 'abs ic', parent, AGENT_GLYPH(d*.5)); size(o, d, d); o.style.background = 'radial-gradient(circle at 35% 30%,#bfe9ff,#4dbcff 45%,#0a8fe6 100%)'; o.style.boxShadow = '0 10px 26px -10px rgba(10,143,230,.6)'; return o; };
+function rings(parent, variant) { // chapter-card motif: rotating 1px outline ellipses (globe) or concentric circles
+  const g = el('div', 'abs', parent); size(g, W, H);
+  const svg = variant === 'globe'
+    ? `<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" stroke="rgba(255,255,255,.32)" stroke-width="2.2">${[0,1,2,3,4,5].map(i => `<ellipse class="rg" cx="960" cy="540" rx="${90+i*95}" ry="430"/>`).join('')}<ellipse class="rg" cx="960" cy="540" rx="620" ry="250"/></svg>`
+    : `<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" stroke="rgba(255,255,255,.34)" stroke-width="2.2">${[0,1,2].map(i => `<circle class="rg" cx="${960 + i*30}" cy="${540 - i*20}" r="${330+i*80}"/>`).join('')}</svg>`;
+  g.innerHTML = svg; return { g, els: [...g.querySelectorAll('.rg')] };
+}
+function hotText(parent, text, size_, width, color='#555') { // freshly typed words tinted blue→pink, cooling to body grey
+  const box = el('div', 'abs', parent); box.style.cssText += `;width:${width}px;font-size:${size_}px;line-height:1.55;color:${color};white-space:pre-wrap`;
+  const spans = [...text].map(ch => { const s = el('span', '', box); s.textContent = ch; return s; });
+  return { box, render(t, t0, cps) {
+    spans.forEach((s, i) => { const ti = typeof cps === 'function' ? cps(i) : t0 + i/cps; const vis = t >= ti; s.style.visibility = vis ? 'visible' : 'hidden';
+      if (vis) { const age = t - ti; const hot = 1 - clamp(age/.7); // newest = pink, then blue, then grey
+        const rC = age < .18 ? [236, 92, 170] : [10, 157, 242];
+        s.style.color = hot > .02 ? `rgb(${lerp(85, rC[0], hot)},${lerp(85, rC[1], hot)},${lerp(85, rC[2], hot)})` : ''; } });
+  } };
+}
+
+/* =========================================================
+   #1–8  Logo build → retract → brand dot
+   ========================================================= */
+const L = el('div', 'layer'); L.style.zIndex = 5;
+const D0 = 104, WM_SIZE = 108, WM_TEXT = 'Relay', WM_W = mw(WM_TEXT, WM_SIZE, 500), GAP = 22;
+const streak = el('div', 'abs', L); size(streak, 900, 60); streak.style.background = 'linear-gradient(90deg,rgba(255,255,255,.7),rgba(255,255,255,0))'; streak.style.borderRadius = '30px';
+const wmClip = el('div', 'abs', L); wmClip.style.overflow = 'hidden'; size(wmClip, WM_W + GAP + D0, 140);
+const wm = el('div', 'abs', wmClip, WM_TEXT); wm.style.cssText += `;font-size:${WM_SIZE}px;font-weight:500;letter-spacing:-.015em;line-height:140px;white-space:nowrap`;
+const sph = el('div', 'abs sphere', L); sph.style.zIndex = 3;
+const flat = el('div', 'abs', L); flat.style.cssText += ';border-radius:50%;background:var(--azure);z-index:4';
+function logo(t, tIn, tWm, tOut, tDot) {
+  // tIn: sphere arrives · tWm: wordmark emerges from behind the sphere · tOut: retracts · tDot: recolour + circle-reveal
+  const arr = P(t, tIn, .7, EO), sc = lerp(1.5, 1, arr);
+  const rev = P(t, tWm, .7, EO) * (tOut != null ? 1 - P(t, tOut, .6, EI) : 1);
+  const total = D0 + GAP + WM_W;
+  const sx = lerp(W/2 - D0/2, W/2 - total/2, rev); // live re-centre as the wordmark grows
+  const sy = H/2 - D0/2;
+  tf(sph, sx, sy, sc, tIn === 0 ? 1 : P(t, tIn, .12, LIN)); size(sph, D0, D0);
+  tf(streak, sx + D0*.5, sy + D0/2 - 30, 1, tIn === 0 ? (1 - P(t, 0, .6, LIN))*.9 : 0);
+  // mask edge = sphere circumference: the clip starts at the sphere's centre, the word slides out from behind it
+  tf(wmClip, sx + D0/2, sy + D0/2 - 70, 1, 1); wm.style.transform = `translateX(${lerp(-WM_W, D0/2 + GAP, rev)}px)`;
+  // brand dot: gradient → flat azure while scaling ×2.6, then cover the frame
+  if (tDot != null && t >= tDot) {
+    const g = P(t, tDot, .45, EO), c = P(t, tDot + .4, .38, EI);
+    const d = lerp(D0, 270, g) + c*2300;
+    show(flat, true); size(flat, d, d); tf(flat, W/2 - d/2, H/2 - d/2, 1, P(t, tDot, .18, LIN));
+  } else show(flat, false);
+}
+
+/* =========================================================
+   Chapter cards  (#9–11, #19–20, #37–39)
+   ========================================================= */
+function chapter(variant, words, reserve=false) {
+  const g = el('div', 'layer'); g.style.background = 'var(--azure)'; g.style.zIndex = 6;
+  const r = rings(g, variant);
+  const titleWords = words.map(w => { const e = el('div', 'abs', g, w.t); e.style.cssText += ';font-size:128px;font-weight:500;color:#fff;letter-spacing:-.01em;white-space:nowrap;line-height:1'; return { ...w, e, w: mw(w.t, 128) }; });
+  return { g, r, titleWords, reserve };
+}
+const CH1 = chapter('globe', [{t:'Choose',tin:3.62},{t:'Agent',tin:3.62}]);
+const CH2 = chapter('rings', [{t:'Customize',tin:8.9},{t:'Agent',tin:8.9}]);
+const CH3 = chapter('globe', [{t:'Your',tin:17.98},{t:'agent',tin:17.98},{t:'is',tin:18.45},{t:'ready',tin:18.5}], true);
+function renderChapter(C, t, dx=0, dy=0, fade=1) {
+  C.r.els.forEach((e, i) => e.setAttribute('transform', `rotate(${(t*9 + i*17) * (i % 2 ? -1 : 1)} 960 540)`));
+  const vis = C.titleWords.map(w => C.reserve ? 1 : P(t, w.tin, .55, EO));
+  let tot = 0; C.titleWords.forEach((w, i) => tot += w.w*vis[i] + (i ? 30*Math.min(vis[i-1], vis[i]) : 0));
+  let x = W/2 - tot/2 + dx;
+  C.titleWords.forEach((w, i) => { if (i) x += 30*Math.min(vis[i-1], vis[i]); show(w.e, t >= w.tin);
+    const p = P(t, w.tin, .55, EO); tf(w.e, x, 476 + dy + (1-p)*20, lerp(.92, 1, p), P(t, w.tin, .2, LIN)*fade); blur(w.e, (1-p)*8); x += w.w*vis[i]; });
+}
+
+/* =========================================================
+   #12–18  Agent tiles: chaos → order → DOF selection → click bloom
+   ========================================================= */
+const TL = el('div', 'layer'); TL.style.zIndex = 5; const TC = el('div', 'cam', TL);
+const TILES = [
+  { n: 'Tax Planner', c: '#f59a6b', s: [-80, 30, 1.15, 5] },
+  { n: 'Contract Reviewer', c: '#f4a07a', s: [560, 150, .85, 5] },
+  { n: 'Audit Support Agent', c: '#0a9df2', s: [1380, 70, 1.05, 0] },
+  { n: 'Controlling Agent', c: '#f7926a', s: [1140, 390, .9, 4] },
+  { n: 'Compliance Agent', c: '#0a9df2', s: [130, 470, 1.0, 0], hero: true },
+  { n: 'Legal Risk Assessor', c: '#e889d9', s: [1010, 700, 1.1, 0] },
+  { n: 'Code reviewer', c: '#f59a6b', s: [-60, 860, 1.2, 6] },
+];
+const TW = 700, TH = 150, COLY = [ -260, -60, 140, 340, 540, 740, 940 ];
+TILES.forEach((t_, i) => {
+  const e = el('div', 'abs card tile', TC, `<span class="ic" style="width:64px;height:64px;background:${t_.c}">${AGENT_GLYPH(32)}</span><span>${t_.n}</span>`);
+  size(e, TW, TH); t_.e = e; t_.col = [W/2 - TW/2, COLY[i] - TH/2];
+  if (t_.hero) { t_.desc = el('div', 'abs', e, 'Reviews contract documents and flags risky clauses.'); t_.desc.style.cssText += ';left:38px;top:150px;width:640px;font-size:34px;font-weight:400;color:#666;line-height:1.45;white-space:normal'; }
+});
+const hero = TILES.find(t_ => t_.hero);
+const cur1 = mkCursor(TL);
+const bloom = el('div', 'abs', TL); bloom.style.cssText += ';border-radius:50%;background:radial-gradient(closest-side,#0a9df2 55%,rgba(10,157,242,.55) 78%,rgba(10,157,242,0));z-index:60';
+function renderTiles(t) {
+  const conv = P(t, 5.5, 1.05, EIO); // scattered depth field → aligned column (#12→#14)
+  TILES.forEach((t_, i) => {
+    const [sx, sy, ss, sb] = t_.s;
+    const x = lerp(sx, t_.col[0], conv), y = lerp(sy, t_.col[1], conv), s = lerp(ss, 1, conv);
+    tf(t_.e, x + Math.sin(t*1.3 + i)*4*(1-conv), y, s, 1); blur(t_.e, lerp(sb, 0, conv));
+  });
+  // push into the column, then macro on the hero tile; neighbours defocus (#15–#16)
+  const push = P(t, 6.75, .75, EIO);
+  const heroCx = W/2, heroCy = hero.col[1] + TH/2;
+  const expand = P(t, 7.1, .6, EO); size(hero.e, lerp(TW, 760, expand), lerp(TH, 330, expand)); hero.e.style.alignItems = expand > .1 ? 'flex-start' : 'center'; hero.e.style.paddingTop = lerp(0, 36, expand) + 'px';
+  hero.e.style.flexDirection = expand > .5 ? 'column' : 'row'; hero.e.style.gap = expand > .5 ? '18px' : '22px';
+  hero.desc.style.opacity = P(t, 7.35, .3, LIN); hero.desc.style.top = '190px';
+  const s = lerp(1, 1.7, push); cam(TC, s, lerp(heroCx, W/2 - TW/2 + 380, expand), lerp(heroCy, hero.col[1] + 165, expand), W/2, H/2);
+  hero.e.style.zIndex = 5;
+  TILES.forEach((t_, i) => { if (t_.hero) return; if (t > 6.8) blur(t_.e, 8*push);
+    const below = i > TILES.indexOf(hero); if (t > 7.0) tf(t_.e, t_.col[0], t_.col[1] + (below ? expand*190 : -expand*10), 1, 1); });
+  // hero cursor enters bottom-right, glides to the tile, clicks (#16–#17)
+  const cm = P(t, 7.45, .6, EIO), press = t > 8.05 && t < 8.2;
+  show(cur1, t > 7.4); tf(cur1, lerp(1990, 1330, cm), lerp(1180, 690, cm), press ? .88 : 1, 1);
+  // bloom floods from the side the cursor came from (#18) → chapter 2
+  const b = P(t, 8.18, .78, EI), R = b*2600; show(bloom, t > 8.18); size(bloom, R*2, R*2); tf(bloom, 1920 - R, 1080 - R, 1, 1);
+}
+
+/* =========================================================
+   #21–36  Wizard card: one persistent modal, bodies swap in place
+   ========================================================= */
+const WZ = el('div', 'layer'); WZ.style.zIndex = 5;
+const CW = 1480, CHh = 740, CX0 = W/2 - CW/2, CY0 = H/2 - CHh/2;
+const wiz = el('div', 'abs card', WZ); size(wiz, CW, CHh); tf(wiz, CX0, CY0);
+const wTitle = el('div', 'abs', wiz); wTitle.style.cssText += ';left:64px;top:54px;font-size:56px;font-weight:600;letter-spacing:-.01em';
+const next = el('div', 'abs pill', wiz, 'Next'); next.style.cssText += ';right:64px;top:46px;left:auto;width:220px;height:80px;background:#161616;color:#fff;font-size:31px;font-weight:500';
+const inner = el('div', 'abs', wiz); inner.style.cssText += ';left:64px;top:160px;width:1352px;height:516px;border:1.5px solid rgba(0,0,0,.07);border-radius:18px';
+const INSTR = 'You are a Compliance Agent supporting Legal and Risk teams. You ensure all actions, recommendations, and outputs align with corporate policies, regulatory requirements, and industry standards.';
+const instr = hotText(inner, INSTR, 44, 1200); instr.box.style.left = '48px'; instr.box.style.top = '40px';
+const listBody = el('div', 'abs', inner); listBody.style.cssText += ';left:26px;top:30px;width:1300px;height:300px';
+const band = el('div', 'abs', listBody); band.style.cssText += ';height:96px;width:1300px;border-radius:14px;background:#f1f1f1';
+const ICONS = {
+  signdesk: `<svg width="42" height="42" viewBox="0 0 24 24"><path d="M3 5l7 7-7 7h4l5-5 5 5h4l-7-7 7-7h-4l-5 5-5-5z" fill="#3b3bd6"/></svg>`,
+  contractly: `<svg width="42" height="42" viewBox="0 0 24 24"><rect x="3" y="3" width="12" height="12" rx="2" fill="#e8384f"/><rect x="9" y="9" width="12" height="12" rx="2" fill="#4b3bd6" opacity=".9"/></svg>`,
+  paperwise: `<svg width="42" height="42" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#23a36b"/><text x="12" y="16" font-size="10" text-anchor="middle" fill="#fff" font-family="Outfit" font-weight="600">pw</text></svg>`,
+  atlas: `<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c3 3 3 13 0 16M12 4c-3 3-3 13 0 16"/></svg>`,
+  nova: `<svg width="42" height="42" viewBox="0 0 24 24" fill="#e0683a"><path d="M12 2l1.6 6.4L20 10l-6.4 1.6L12 18l-1.6-6.4L4 10l6.4-1.6z"/></svg>`,
+  lyra: `<svg width="42" height="42" viewBox="0 0 24 24" fill="#e0683a"><path d="M12 3l1.2 5.2L18 6l-2.2 4.8L21 12l-5.2 1.2L18 18l-4.8-2.2L12 21l-1.2-5.2L6 18l2.2-4.8L3 12l5.2-1.2L6 6l4.8 2.2z"/></svg>`,
+};
+const LISTS = { integ: [['signdesk','SignDesk'],['contractly','Contractly'],['paperwise','Paperwise']], model: [['atlas','Atlas 5.4'],['nova','Nova 4.6'],['lyra','Lyra 4.6']] };
+const rows = [0,1,2].map(i => { const r = el('div', 'row', listBody); r.style.top = (i*110) + 'px'; r.style.zIndex = 2; return r; });
+const drop = el('div', 'abs', inner); drop.style.cssText += ';left:26px;top:26px;width:1300px;height:464px;border:2px dashed rgba(0,0,0,.12);border-radius:16px;background:#fbfbfb';
+const attach = el('div', 'abs pill', drop, '+&nbsp; Attach files'); attach.style.cssText += ';width:300px;height:76px;left:500px;top:194px;background:#fff;border:1px solid rgba(0,0,0,.1);font-size:33px';
+const FILES = [['pdf','Corporate_Rulebook_v1.0_2026.pdf'],['pdf','Policy_Documents_Master_v2.0.pdf'],['xls','Policy_Documents_Review_Schedule.xlsx']];
+const fileIcon = kind => `<span class="ic" style="width:46px;height:54px;border-radius:8px;background:${kind === 'pdf' ? '#e53935' : '#1e9e54'};color:#fff;font-size:14px;font-weight:700">${kind.toUpperCase()}</span>`;
+const fRows = FILES.map(([k, n], i) => { const r = el('div', 'abs', inner, `<div style="display:flex;align-items:center;gap:22px">${fileIcon(k)}<span>${n}</span></div>`); r.style.cssText += `;left:60px;top:${60 + i*96}px;font-size:34px;white-space:nowrap`; return r; });
+const stack = el('div', 'abs', WZ); stack.style.zIndex = 49;
+stack.innerHTML = FILES.map(([k], i) => `<div style="position:absolute;left:${i*14}px;top:${i*40}px;transform:rotate(${(i-1)*-8}deg)">${fileIcon(k).replace('46px', '66px').replace('54px', '78px')}</div>`).join('');
+const cur2 = mkCursor(WZ);
+function setList(kind) { LISTS[kind].forEach(([ic, lab], i) => { rows[i].innerHTML = `${ICONS[ic]}<span>${lab}</span>`; }); }
+function renderWizard(t) {
+  const step = t < 13.0 ? 0 : t < 15.0 ? 1 : t < 16.0 ? 2 : 3;
+  wTitle.textContent = ['Add Instructions', 'Choose Integration', 'Choose Model', 'Add Knowledge'][step];
+  show(instr.box, step === 0); show(listBody, step === 1 || step === 2); show(drop, step === 3 && t < 17.0); fRows.forEach(r => show(r, step === 3 && t >= 17.0));
+  if (step === 1) setList('integ'); if (step === 2) setList('model');
+  tf(wiz, CX0, CY0 + Math.sin(t*.8)*4, 1, 1);
+  // accelerating type-on, matched to the case: 3 chars at #21, 26 at #22, ~150 at #23, done by #24
+  const N_ = INSTR.length, ct = i => i <= 3 ? 9.97 + i*.01 : i <= 26 ? 10.0 + (i-3)/23*.5 : i <= 150 ? 10.5 + (i-26)/124*.5 : 11.0 + (i-150)/(N_-150)*.45;
+  if (step === 0) instr.render(t, 0, ct);
+  // cursor path (the cursor drives every change)
+  let cx = 2000, cy = 700, press = false;
+  const NX = CX0 + CW - 64 - 95, NY = CY0 + 50 + 35;
+  const rowY = i => CY0 + 160 + 30 + i*110 + 48;
+  if (t >= 11.7 && t < 13.0) { const m = P(t, 11.7, .6, EIO); cx = lerp(2000, NX + 10, m); cy = lerp(620, NY + 8, m); press = t > 12.45 && t < 12.62; }
+  else if (t >= 13.0 && t < 15.0) { const m1 = P(t, 13.15, .35, EIO), m2 = P(t, 13.85, .45, EIO); cx = lerp(NX + 10, CX0 + 560, m1) + m2*140; cy = lerp(NY + 8, rowY(0), m1) + m2*110; }
+  else if (t >= 15.0 && t < 16.0) { const m = P(t, 15.2, .45, EIO); cx = lerp(CX0 + 700, CX0 + 620, m); cy = lerp(rowY(1) + 60, rowY(1), m); }
+  else if (t >= 16.0 && t < 18.0) { const m1 = P(t, 16.05, .7, EIO), m2 = P(t, 17.05, .4, EIO); cx = lerp(1000, W/2 + 20, m1); cy = lerp(1160, CY0 + 160 + 240, m1); cx = lerp(cx, NX + 10, m2); cy = lerp(cy, NY + 8, m2); press = t > 17.5 && t < 17.66; }
+  const cOn = t > 11.7 && t < 17.95; show(cur2, cOn); if (cOn) tf(cur2, cx, cy, press ? .88 : 1, 1);
+  // hover band trails the cursor by ~one frame
+  if (step === 1 || step === 2) { const lagT = t - .06; let by = step === 1 ? (lagT < 13.3 ? -200 : lagT < 13.95 ? 0 : 110) : (lagT < 15.4 ? -200 : 110);
+    band.style.opacity = by < 0 ? 0 : 1; band.style.transform = `translateY(${Math.max(0, by)}px)`; }
+  // Next: hover + press in one (fills with the brand gradient); relabels to "Complete" on the last step
+  const nextBlue = (t > 12.4 && t < 13.0) || t > 17.45;
+  next.style.background = nextBlue ? 'linear-gradient(90deg,#0a8fe6,#5cc8ff)' : '#161616';
+  next.textContent = step === 3 && t >= 17.0 ? 'Complete' : 'Next';
+  next.style.transform = (t > 12.45 && t < 12.62) || (t > 17.5 && t < 17.66) ? 'scale(.95)' : '';
+  // knowledge: fanned file stack dragged in from below, lands as rows
+  const st = t > 16.25 && t < 17.0; show(stack, st); if (st) tf(stack, cx - 60, cy + 40, 1, P(t, 16.25, .15, LIN));
+  fRows.forEach((r, i) => { const p = P(t, 17.0 + i*.07, .45, EO); r.style.opacity = P(t, 17.0 + i*.07, .15, LIN); r.style.transform = `translateY(${(1-p)*18}px)`; });
+}
+
+/* =========================================================
+   #39–47  Chapter card collapses into the agent icon → input → composer → 8× zoom punch on send
+   ========================================================= */
+const AG = el('div', 'layer'); AG.style.zIndex = 5; const AC = el('div', 'cam', AG);
+const collapse = el('div', 'abs', AG); collapse.style.cssText += ';background:var(--azure);z-index:10';
+const orb = agentOrb(AC, 170);
+const comp = el('div', 'abs card', AC); comp.style.overflow = 'hidden';
+const compPh = el('div', 'abs', comp, 'Ask compliance agent'); compPh.style.cssText += ';left:40px;top:32px;font-size:38px;color:#444;white-space:nowrap';
+const compTxt = hotText(comp, 'Review this contract and flag risky clauses', 38, 1100, '#444'); compTxt.box.style.left = '40px'; compTxt.box.style.top = '32px';
+const chip = el('div', 'abs', comp, `${fileIcon('pdf')}<div><div style="font-size:21px;font-weight:500">stark-contract.pdf</div><div style="font-size:17px;color:#999">PDF Document</div></div>`); chip.style.cssText += ';left:40px;top:104px;display:flex;align-items:center;gap:14px;padding:10px 18px 10px 12px;border:1px solid rgba(0,0,0,.08);border-radius:14px;white-space:nowrap';
+const plus = el('div', 'abs pill', comp, '+'); plus.style.cssText += ';width:48px;height:48px;border:1.5px solid rgba(0,0,0,.14);font-size:28px;color:#666';
+const send = el('div', 'abs pill', comp, `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`); send.style.cssText += ';width:58px;height:58px;background:#141414';
+const carriedPdf = el('div', 'abs', AG, fileIcon('pdf').replace('46px', '60px').replace('54px', '70px')); carriedPdf.style.zIndex = 48;
+const cur3 = mkCursor(AC);
+function renderAgent(t) {
+  // the blue card shrinks as a rounded squircle into the agent icon (#39→#40)
+  const c = P(t, 18.95, .45, EI);
+  show(collapse, t < 19.42); if (t < 19.42) { const w = lerp(W, 130, c), h = lerp(H, 130, c); size(collapse, w, h); collapse.style.borderRadius = lerp(0, 65, c) + 'px' ; tf(collapse, W/2 - w/2, H/2 - h/2, 1, 1); const k = clamp(c*3)*30; collapse.style.clipPath = c < .97 ? `polygon(${k}% 0,${100-k}% 0,100% ${k}%,100% ${100-k}%,${100-k}% 100%,${k}% 100%,0 ${100-k}%,0 ${k}%)` : 'none'; }
+  const lift = P(t, 19.75, .6, EO), lift2 = P(t, 20.5, .5, EO);
+  tf(orb, W/2 - 85, lerp(H/2 - 85, 385, lift) - lift2*40, 1, P(t, 19.38, .1, LIN));
+  // input pill → composer (#41→#43)
+  const ex = P(t, 20.5, .5, EO);
+  const w = lerp(680, 1250, ex), h = lerp(116, 320, ex), x = W/2 - w/2, y = lerp(705, 600, ex);
+  size(comp, w, h); tf(comp, x, y + (1 - lift)*30, 1, P(t, 19.75, .3, LIN));
+  compPh.style.opacity = t < 21.3 ? 1 : 0; compTxt.box.style.visibility = t >= 21.3 ? 'visible' : 'hidden'; compTxt.render(t, 21.3, 60);
+  chip.style.opacity = P(t, 21.1, .25, LIN); chip.style.transform = `translateY(${(1-P(t, 21.1, .4, EO))*12}px)`;
+  plus.style.left = '30px'; plus.style.top = (h - 70) + 'px'; plus.style.opacity = ex;
+  send.style.left = (w - 88) + 'px'; send.style.top = (h - 78) + 'px'; send.style.opacity = ex;
+  const pressed = t > 22.9; send.style.background = pressed ? 'linear-gradient(135deg,#5cc8ff,#0a8fe6)' : '#141414';
+  // cursor carries the PDF in, then goes to send
+  const m1 = P(t, 20.35, .6, EIO), m2 = P(t, 21.6, .45, EIO);
+  const sx = x + w - 88 + 18, sy = y + h - 78 + 16;
+  const cx = lerp(lerp(1500, x + 700, m1), sx, m2), cy = lerp(lerp(1140, y + 110, m1), sy, m2);
+  show(cur3, t > 20.3); tf(cur3, cx, cy, t > 22.9 && t < 23.05 ? .9 : 1, 1);
+  show(carriedPdf, t > 20.3 && t < 21.1); tf(carriedPdf, cx - 60, cy + 30, 1, 1 - P(t, 20.95, .15, LIN));
+  // 8× zoom punch on the send button, cursor scales with the camera (#45→#47)
+  const zin = P(t, 22.1, .4, EI), zout = P(t, 23.15, .3, EO);
+  const k = zin*(1 - zout), s = lerp(1, 6.5, k);
+  cam(AC, s, sx + 10, sy + 20, lerp(sx + 10, W/2, k), lerp(sy + 20, H/2, k)); // identity at k = 0
+}
+
+/* =========================================================
+   #48–56  Chat: dark bubble drifts up-right, agent card with shimmer, blur-in result
+   ========================================================= */
+const CT = el('div', 'layer'); CT.style.zIndex = 5;
+const bub = el('div', 'abs', CT, `<div style="font-size:42px;line-height:1.4;color:#eee;width:680px">Review this contract and flag risky clauses</div><div style="margin-top:22px;display:inline-flex;align-items:center;gap:12px;padding:10px 18px;border:1px solid rgba(255,255,255,.15);border-radius:14px;font-size:30px;color:#eee">${fileIcon('pdf').replace('46px','34px').replace('54px','40px')} stark-contract.pdf</div>`);
+bub.style.cssText += ';padding:44px 50px;border-radius:30px;background:#1e1e1e;box-shadow:0 30px 60px -30px rgba(0,0,0,.35)';
+const agCard = el('div', 'abs card', CT, `<div style="font-size:48px;font-weight:500">Compliance Agent</div><div class="sh" style="font-size:34px;margin-top:10px;background:linear-gradient(90deg,#b5b5b5 0%,#b5b5b5 40%,#2b2b2b 50%,#b5b5b5 60%,#b5b5b5 100%);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent">Reviewing contract…</div>`);
+agCard.style.cssText += ';padding:40px 56px;white-space:nowrap';
+const agOrb = agentOrb(CT, 104);
+const res = el('div', 'abs card', CT, `<div style="display:flex;align-items:center;gap:16px"><span class="ic" style="width:56px;height:56px;background:#161616">${`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`}</span><span style="font-size:54px;font-weight:500">stark-contract.pdf</span></div><div class="rs" style="font-size:38px;color:#9a9a9a;margin:10px 0 0 74px">Contract approved</div>`);
+res.style.cssText += ';padding:46px 60px;white-space:nowrap';
+function renderChat(t) {
+  const up = P(t, 23.95, .6, EIO);
+  const bw = bub.offsetWidth || 780, bh = bub.offsetHeight || 300;
+  tf(bub, lerp(W/2 - bw/2, 1010, up), lerp(H/2 - bh/2 - 60, 120, up), 1, 1 - P(t, 26.25, .3, LIN));
+  const ag = P(t, 24.45, .55, EO);
+  tf(agCard, 400, 520 + (1-ag)*24, 1, P(t, 24.45, .2, LIN) * (1 - P(t, 26.25, .3, LIN))); blur(agCard, (1-ag)*6);
+  tf(agOrb, 250, 640 + (1-ag)*24, lerp(.6, 1, P(t, 24.5, .5, BACK)), P(t, 24.5, .2, LIN) * (1 - P(t, 26.25, .3, LIN)));
+  agCard.querySelector('.sh').style.backgroundPosition = `${100 - ((t - 24.5)*65 % 100)}% 0`;
+  // result: blurred ghost → sharp, text arrives slightly late, then shrinks away (#54–#56)
+  const r = P(t, 26.5, .55, EO), shrink = P(t, 27.55, .45, EI);
+  show(res, t > 26.45 && t < 28.05);
+  const rw = res.offsetWidth || 700, rh = res.offsetHeight || 220;
+  tf(res, W/2 - rw/2, H/2 - rh/2, lerp(1, .0, shrink), P(t, 26.5, .25, LIN)); blur(res, (1-r)*14); res.style.transformOrigin = `${rw/2}px ${rh/2}px`;
+  res.querySelector('.rs').style.opacity = P(t, 26.75, .3, LIN);
+}
+
+/* ---------- master ---------- */
+const layers = { L, CH1: CH1.g, TL, CH2: CH2.g, WZ, CH3: CH3.g, AG, CT };
+function render(t) {
+  t = clamp(t, 0, DUR);
+  const on = { L: t < 3.75 || t >= 27.95, CH1: within(t, 3.7, 5.5), TL: within(t, 5.5, 9.0), CH2: within(t, 8.95, 10.0), WZ: within(t, 10.0, 17.95), CH3: within(t, 17.95, 19.0), AG: within(t, 18.95, 23.45), CT: within(t, 23.45, 28.1) };
+  for (const k in layers) show(layers[k], on[k]);
+  if (on.L) { if (t < 4) logo(t, 0, .55, 2.2, 2.9); else logo(t, 27.95, 28.15, null, null); }
+  if (on.CH1) { const mv = P(t, 4.95, .45, EIO); renderChapter(CH1, t, -mv*440, mv*120); }
+  if (on.TL) renderTiles(t);
+  if (on.CH2) renderChapter(CH2, t);
+  if (on.WZ) renderWizard(t);
+  if (on.CH3) renderChapter(CH3, t, 0, 0, 1 - P(t, 18.95, .1, LIN)*.5);
+  if (on.AG) renderAgent(t);
+  if (on.CT) renderChat(t);
+  if (t >= 27.95) { const pop = P(t, 28.0, .45, BACK); sph.style.transform += ` scale(${pop})`; }
+}
+
+/* ---------- playback / capture ---------- */
+const playBtn = document.getElementById('play'), scrub = document.getElementById('scrub'), timeEl = document.getElementById('time');
+function fit() { const vp = document.getElementById('viewport').getBoundingClientRect(); const s = CAPTURE ? 1 : Math.min(vp.width/W, vp.height/H); stage.style.transform = `translate(${(vp.width - W*s)/2}px,${(vp.height - H*s)/2}px) scale(${s})`; }
+addEventListener('resize', fit); fit();
+window.renderAt = t => new Promise(r => { render(t); requestAnimationFrame(() => requestAnimationFrame(r)); });
+window.__ready = true; render(0);
+if (CAPTURE) return;
+let playing = false, clock = 0, last = 0;
+const ui = () => { playBtn.textContent = playing ? 'Pause' : 'Play'; timeEl.textContent = clock.toFixed(2); scrub.value = clock; };
+playBtn.onclick = () => { playing = !playing; if (playing && clock >= DUR - .01) clock = 0; last = performance.now(); ui(); };
+addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); playBtn.onclick(); } });
+scrub.oninput = () => { clock = +scrub.value; render(clock); ui(); };
+(function tick(now) { if (playing) { clock += (now - last)/1000; last = now; if (clock >= DUR) { clock = 0; } render(clock); ui(); } requestAnimationFrame(tick); })(performance.now());
+})();
+</script>
+</body>
+</html>

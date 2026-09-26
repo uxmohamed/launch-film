@@ -18,6 +18,7 @@ The goal is to make new films that feel like the same world-class team made them
 - `references/cases/*.md`: per-film breakdowns. Cite them when you justify a choice.
 - `templates/storyboard.md`: fill it in **before** animating.
 - `examples/`: a working 20 s film engine (`cadie-film.html`), a renderer (`render.js`) and a contact-sheet slicer.
+- `examples/recreation-veryfront/`: a complete, shot-by-shot recreation of the Veryfront case (fictional brand "Relay"), with a shot map linking every scene to its technique. Study it before building a similar product film.
 
 ---
 
